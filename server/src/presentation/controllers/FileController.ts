@@ -37,16 +37,24 @@ export class FileController {
 
   /**
    * Completa o upload de um arquivo
-   * Salva metadados no banco após upload ao S3
+   * Salva metadados no banco após upload ao Supabase Storage
+   *
+   * Nota: O front-end já possui todas as informações necessárias:
+   * - fileId: recebido do initUpload
+   * - fileName: nome original do arquivo selecionado pelo usuário
+   * - fileSize: tamanho do arquivo (file.size)
+   * Não é necessário cache (Redis) para armazenar essas informações.
    */
   static async completeUpload(request: FastifyRequest, reply: FastifyReply) {
     const userId = request.user?.id!;
-    const { uploadId, encryptedFek, encryptionMetadata } =
-      request.body as CompleteUploadDTO;
-
-    // Nota: precisamos extrair fileId e fileName do uploadId ou de outro lugar
-    // Por enquanto, vamos assumir que o cliente envia esses dados
-    // Idealmente, deveríamos armazenar o uploadId em cache (Redis) com os metadados
+    const {
+      uploadId,
+      fileId,
+      fileName,
+      fileSize,
+      encryptedFek,
+      encryptionMetadata,
+    } = request.body as CompleteUploadDTO;
 
     const fileRepository = new FileRepository();
     const storageService = new SupabaseStorageService();
@@ -55,33 +63,30 @@ export class FileController {
       storageService
     );
 
-    // TODO: Implementar cache para armazenar metadados temporários do upload
-    // Por enquanto, retornaremos erro informando que precisa implementar cache
-    return reply.status(501).send({
-      error: "Upload completion requires cache implementation",
-      message:
-        "Need to implement Redis cache to store temporary upload metadata",
-    });
-
-    // Código que será usado quando implementarmos o cache:
-    /*
     const result = await completeUploadUseCase.execute({
       userId,
       uploadId,
-      fileId, // do cache
-      fileName, // do cache
-      fileSize, // do cache
+      fileId,
+      fileName,
+      fileSize,
       encryptedFek,
       encryptionMetadata,
     });
 
-    return reply.status(200).send(result);
-    */
+    return reply.status(200).send({
+      message: "Upload completado com sucesso",
+      data: {
+        fileId: result.fileId,
+        fileName: result.fileName,
+        sizeBytes: result.sizeBytes,
+        uploadedAt: result.uploadedAt.toISOString(),
+      },
+    });
   }
 
   /**
    * Inicia o download de um arquivo
-   * Retorna presigned URL para download direto do S3
+   * Retorna presigned URL para download direto do Supabase Storage
    */
   static async download(request: FastifyRequest, reply: FastifyReply) {
     const userId = request.user?.id!;
@@ -121,7 +126,17 @@ export class FileController {
     });
 
     return reply.send({
-      data: result,
+      data: {
+        files: result.files.map((file) => ({
+          fileId: file.fileId,
+          fileName: file.fileName,
+          sizeBytes: file.sizeBytes,
+          createdAt: file.createdAt.toISOString(),
+        })),
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+      },
     });
   }
 }

@@ -139,8 +139,8 @@ export class SupabaseStorageService {
     path: string,
     expiresIn: number = 3600
   ): Promise<string> {
-    // Supabase não tem presigned upload URLs como S3
-    // A melhor prática é fazer upload via backend ou usar upload signed URL
+    // Usa createSignedUploadUrl do Supabase para upload direto do cliente
+    // Similar às presigned URLs do S3, mas gerenciado pelo Supabase
     const { data, error } = await this.client.storage
       .from(this.bucket)
       .createSignedUploadUrl(path);

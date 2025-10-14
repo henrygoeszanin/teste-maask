@@ -107,6 +107,9 @@ export default function FileManager() {
       setMessage('✔️ Finalizando upload...');
       await completeUpload({
         uploadId: initResponse.data.uploadId,
+        fileId: initResponse.data.fileId,
+        fileName: file.name,
+        fileSize: file.size,
         encryptedFek: arrayBufferToBase64(encryptedFek),
         encryptionMetadata: {
           algorithm: 'AES-256-GCM',

@@ -342,6 +342,9 @@ export async function initUpload(
 
 export interface CompleteUploadRequest {
   uploadId: string;
+  fileId: string;
+  fileName: string;
+  fileSize: number;
   encryptedFek: string;
   encryptionMetadata: {
     algorithm: string;

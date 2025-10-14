@@ -31,7 +31,7 @@ export async function fileRoutes(app: FastifyInstance) {
       schema: {
         tags: ["Files"],
         description:
-          "Inicia um upload de arquivo e retorna presigned URL para upload direto ao S3 (requer Bearer token)",
+          "Inicia um upload de arquivo e retorna presigned URL para upload direto ao Supabase Storage (requer Bearer token)",
         body: withExamples(InitUploadSchema, [
           {
             fileName: "profile-browser.zip",
@@ -46,7 +46,7 @@ export async function fileRoutes(app: FastifyInstance) {
                 uploadId: "upload-uuid-123",
                 fileId: "file-uuid-456",
                 presignedUrl:
-                  "https://s3.amazonaws.com/bucket/file?signature=...",
+                  "https://txuiaqcmkhttexzhijmp.supabase.co/storage/v1/object/upload/sign/user-data/...",
                 expiresIn: 3600,
               },
             },
@@ -76,6 +76,9 @@ export async function fileRoutes(app: FastifyInstance) {
         body: withExamples(CompleteUploadSchema, [
           {
             uploadId: "upload-uuid-123",
+            fileId: "file-uuid-456",
+            fileName: "profile-browser.zip",
+            fileSize: 104857600,
             encryptedFek: "encrypted-fek-base64-content",
             encryptionMetadata: {
               algorithm: "AES-256-GCM",
@@ -129,7 +132,7 @@ export async function fileRoutes(app: FastifyInstance) {
                 fileId: "file-uuid-456",
                 fileName: "profile-browser.zip",
                 presignedUrl:
-                  "https://s3.amazonaws.com/bucket/file?signature=...",
+                  "https://txuiaqcmkhttexzhijmp.supabase.co/storage/v1/object/sign/user-data/...",
                 encryptedFek: "encrypted-fek-base64-content",
                 encryptionMetadata: {
                   algorithm: "AES-256-GCM",

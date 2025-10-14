@@ -34,6 +34,9 @@ export type InitUploadResponseDTO = z.infer<typeof InitUploadResponseSchema>;
 // Schema para completar upload
 export const CompleteUploadSchema = z.object({
   uploadId: z.string().min(1, "uploadId é obrigatório"),
+  fileId: z.string().min(1, "fileId é obrigatório"),
+  fileName: z.string().min(1, "fileName é obrigatório"),
+  fileSize: z.number().int().positive("fileSize deve ser maior que 0"),
   encryptedFek: z
     .string()
     .min(1, "encryptedFek é obrigatório")

@@ -27,7 +27,7 @@ API Backend (Fastify)
     ↓
 Banco de Dados (PostgreSQL) - Apenas metadados
     ↓
-Storage (AWS S3 / Supabase) - Arquivos criptografados
+Supabase Storage - Arquivos criptografados
 ```
 
 ### Conceitos de Criptografia
@@ -406,13 +406,13 @@ API processa:
 2. Valida dados (max 500MB)
 3. Gera uploadId (ULID)
 4. Gera fileId (UUID)
-5. Gera caminho S3: users/{userId}/files/{fileId}
+5. Gera caminho no Storage: users/{userId}/files/{fileId}
 6. Gera presigned URL (válida por 1 hora)
 
 Response: {
   "uploadId": "01HX...",
   "fileId": "a1b2c3d4-...",
-  "presignedUrl": "https://s3.../users/01HX.../files/a1b2...",
+  "presignedUrl": "https://txuiaqcmkhttexzhijmp.supabase.co/storage/v1/object/upload/sign/user-data/...",
   "expiresIn": 3600
 }
 ```
@@ -424,8 +424,8 @@ file.routes.ts (POST /files/upload/init)
   → preHandler: authenticate
   → FileController.initUpload()
     → InitUploadUseCase.execute()
-      → S3Service.generateFileKey()
-      → S3Service.generatePresignedUploadUrl()
+      → SupabaseStorageService.generateFileKey()
+      → SupabaseStorageService.generatePresignedUploadUrl()
 ```
 
 ### Fase 2: Criptografar e Enviar Arquivo
@@ -471,13 +471,10 @@ while (true) {
 // 5. Combina chunks criptografados
 const encryptedFile = concatenateArrayBuffers(encryptedChunks);
 
-// 6. Upload para S3 usando presigned URL
+// 6. Upload para Supabase Storage usando presigned URL
 const uploadResponse = await fetch(presignedUrl, {
   method: "PUT",
   body: encryptedFile,
-  headers: {
-    "Content-Type": file.type,
-  },
 });
 
 if (!uploadResponse.ok) {
@@ -554,16 +551,19 @@ Body: {
 
 API processa:
 1. Autentica usuário
-2. Recupera metadados do cache Redis (uploadId → fileName, fileSize, fileId)
-3. Verifica se arquivo existe no S3
+2. Recebe metadados do front-end (fileName, fileSize, fileId)
+3. Verifica se arquivo existe no Supabase Storage
 4. Cria entidade File
 5. Salva metadados no banco
 
 Response: {
-  "fileId": "a1b2c3d4-...",
-  "fileName": "perfil-chrome.zip",
-  "sizeBytes": 52428800,
-  "uploadedAt": "2025-10-14T12:05:00Z"
+  "message": "Upload completado com sucesso",
+  "data": {
+    "fileId": "a1b2c3d4-...",
+    "fileName": "perfil-chrome.zip",
+    "sizeBytes": 52428800,
+    "uploadedAt": "2025-10-14T12:05:00Z"
+  }
 }
 ```
 
@@ -574,7 +574,7 @@ file.routes.ts (POST /files/upload/complete)
   → preHandler: authenticate
   → FileController.completeUpload()
     → CompleteUploadUseCase.execute()
-      → S3Service.fileExists()
+      → SupabaseStorageService.fileExists()
       → File.create()
       → FileRepository.create()
         → PostgreSQL (files table)
@@ -629,21 +629,23 @@ API processa:
 1. Autentica usuário
 2. Busca arquivo no banco por fileId
 3. Verifica se arquivo pertence ao usuário
-4. Verifica se arquivo existe no S3
+4. Verifica se arquivo existe no Supabase Storage
 5. Gera presigned URL para download (1 hora)
 6. Retorna metadados + presigned URL
 
 Response: {
-  "fileId": "a1b2c3d4-...",
-  "fileName": "perfil-chrome.zip",
-  "presignedUrl": "https://s3.../users/01HX.../files/a1b2...",
-  "encryptedFek": "base64-encrypted-fek...",
-  "encryptionMetadata": {
-    "algorithm": "AES-256-GCM",
-    "iv": "base64-iv...",
-    "authTag": "base64-auth-tag..."
-  },
-  "expiresIn": 3600
+  "data": {
+    "fileId": "a1b2c3d4-...",
+    "fileName": "perfil-chrome.zip",
+    "presignedUrl": "https://txuiaqcmkhttexzhijmp.supabase.co/storage/v1/object/sign/user-data/...",
+    "encryptedFek": "base64-encrypted-fek...",
+    "encryptionMetadata": {
+      "algorithm": "AES-256-GCM",
+      "iv": "base64-iv...",
+      "authTag": "base64-auth-tag..."
+    },
+    "expiresIn": 3600
+  }
 }
 ```
 
@@ -655,8 +657,8 @@ file.routes.ts (GET /files/:fileId/download)
   → FileController.download()
     → DownloadFileUseCase.execute()
       → FileRepository.findByFileId()
-      → S3Service.fileExists()
-      → S3Service.generatePresignedDownloadUrl()
+      → SupabaseStorageService.fileExists()
+      → SupabaseStorageService.generatePresignedDownloadUrl()
 ```
 
 ### Fase 2: Baixar e Descriptografar
@@ -687,7 +689,7 @@ const fekBuffer = await crypto.subtle.decrypt(
 
 const fek = new Uint8Array(fekBuffer);
 
-// 4. Download do arquivo criptografado do S3
+// 4. Download do arquivo criptografado do Supabase Storage
 const fileResponse = await fetch(presignedUrl);
 const encryptedFileBuffer = await fileResponse.arrayBuffer();
 
@@ -1025,7 +1027,7 @@ if (createEnvelopeResponse.ok) {
 }
 ```
 
-**Estado Final no Servidor:**
+**Estado no Servidor:**
 
 ```sql
 -- Tabela devices (device-2 agora está ativo)
@@ -1103,7 +1105,7 @@ id | user_id | device_id | envelope_ciphertext    | created_at
 │  ✅ MESMA MDK em ambos os dispositivos!                         |
 │  ✅ Cada um descriptografa com sua própria chave privada        │
 │  ✅ Servidor nunca viu a MDK em texto plano                     │
-│  ✅ Ambos podem acessar os mesmos arquivos                      │
+│  ✅ Ambos podem acessar os mesmos arquivos                      │ │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -1279,807 +1281,6 @@ id | user_id | device_id | envelope_ciphertext    | created_at
                                                     ← envelope2 REMOVIDO!
 ```
 
-#### O Que Acontece no Dispositivo Revogado
-
-```javascript
-// No Dispositivo 2 (Revogado)
-
-// Cenário 1: Tentativa de fazer login após revogação
-async function loginAfterRevocation() {
-  // 1. Login bem-sucedido (JWT ainda funciona se não expirou)
-  const loginResponse = await fetch("/api/login", {
-    method: "POST",
-    body: JSON.stringify({ email, password }),
-  });
-
-  const { accessToken } = await loginResponse.json();
-  console.log("✅ Login OK");
-
-  // 2. Tenta buscar envelope
-  const envelopeResponse = await fetch("/api/envelopes/me", {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "X-Device-Id": "device-2",
-    },
-  });
-
-  if (envelopeResponse.status === 404) {
-    console.log("❌ ERRO: Envelope não encontrado!");
-    console.log("⚠️ Este dispositivo foi revogado.");
-    console.log("💡 Entre em contato com suporte ou autorize novamente.");
-
-    // Mostra mensagem ao usuário
-    alert(
-      "Este dispositivo não tem mais acesso aos arquivos.\n" +
-        "Possíveis razões:\n" +
-        "- Dispositivo foi revogado por segurança\n" +
-        "- Acesso foi removido por outro dispositivo\n\n" +
-        "Para recuperar o acesso, solicite autorização novamente."
-    );
-
-    return null;
-  }
-}
-
-// Cenário 2: Dispositivo já tem MDK na memória (antes da revogação)
-async function tryToAccessFileAfterRevocation() {
-  // MDK ainda está na memória do dispositivo
-  const mdk = window.maask?.mdk;
-
-  if (mdk) {
-    console.log("MDK ainda presente na memória!");
-
-    // ✅ Pode descriptografar arquivos JÁ BAIXADOS
-    // ❌ NÃO pode baixar novos arquivos (precisa de token válido)
-
-    // Tentativa de download
-    try {
-      const response = await fetch("/api/files/123/download", {
-        headers: {
-          Authorization: `Bearer ${expiredOrRevokedToken}`,
-        },
-      });
-
-      if (response.status === 401) {
-        console.log("❌ Token inválido/expirado");
-        console.log("⚠️ Não é possível baixar novos arquivos");
-      }
-
-      if (response.status === 403) {
-        console.log("❌ Dispositivo revogado");
-        console.log("⚠️ Acesso negado pelo servidor");
-      }
-    } catch (error) {
-      console.error("Erro ao acessar arquivo:", error);
-    }
-  }
-}
-```
-
-#### Impacto da Revogação
-
-**✅ O que o dispositivo revogado PERDE:**
-
-1. **Acesso a novos arquivos:**
-
-   - Não pode mais baixar arquivos do servidor
-   - API rejeita requisições (403 Forbidden)
-
-2. **Acesso à MDK após logout/reinício:**
-
-   - Não consegue mais buscar envelope
-   - Não pode descriptografar MDK
-   - Sem MDK = Não descriptografa FEK = Não acessa arquivos
-
-3. **Capacidade de fazer upload:**
-   - Não pode mais fazer upload de novos arquivos
-   - Não pode criptografar novos arquivos (sem MDK)
-
-**❌ O que o dispositivo revogado MANTÉM (temporariamente):**
-
-1. **MDK na memória (até logout/reinício):**
-
-   - Se MDK estiver em RAM, continua lá
-   - Pode descriptografar arquivos já baixados
-   - **Solução:** Usuário deve fazer logout/reiniciar dispositivo
-
-2. **Arquivos já baixados:**
-   - Arquivos salvos localmente ainda são acessíveis
-   - **Importante:** Este é um comportamento esperado
-   - **Mitigação:** Arquivos devem ser baixados criptografados e descriptografados em memória
-
-**✅ O que OUTROS dispositivos MANTÊM:**
-
-- Dispositivo 1: Funcionamento 100% normal
-- Dispositivo 3: Funcionamento 100% normal
-- Ambos ainda têm seus envelopes
-- Ambos ainda podem acessar arquivos
-- Zero impacto na experiência dos outros dispositivos
-
-#### Cenários de Revogação
-
-##### Cenário 1: Dispositivo Perdido/Roubado
-
-```
-Timeline:
-10:00 - Usuário perde celular (Device 2)
-10:30 - Usuário acessa laptop (Device 1) e revoga Device 2
-10:31 - Envelope2 deletado do banco
-10:32 - Device 2 status = "revoked"
-
-Resultado:
-- Se ladrão tentar fazer login → Não consegue buscar envelope
-- Se ladrão já estava logado → Pode acessar arquivos baixados (mas não novos)
-- Usuário está seguro: novos arquivos não são acessíveis
-```
-
-**Recomendação:** Usuário deve também trocar senha para invalidar tokens JWT.
-
-##### Cenário 2: Funcionário Deixa Empresa
-
-```
-Timeline:
-09:00 - Funcionário usa laptop da empresa (Device 4)
-17:00 - Funcionário é desligado
-17:05 - Admin revoga Device 4
-17:06 - Admin troca senha do funcionário (invalida tokens)
-
-Resultado:
-- Laptop corporativo não pode mais acessar arquivos
-- Funcionário não consegue fazer login (senha trocada)
-- Todos os outros dispositivos continuam funcionando
-```
-
-##### Cenário 3: Dispositivo Suspeito
-
-```
-Timeline:
-14:00 - Usuário vê login suspeito de IP desconhecido (Device 5)
-14:01 - Usuário revoga Device 5 imediatamente
-14:02 - Usuário ativa 2FA (segurança adicional)
-
-Resultado:
-- Atacante perde acesso imediato
-- Arquivos já baixados podem estar comprometidos
-- Novos arquivos estão seguros
-```
-
-#### Implementação no Backend
-
-```typescript
-// RevokeDeviceUseCase.ts
-
-interface RevokeDeviceInput {
-  userId: string;
-  deviceId: string;
-  reason?: string; // "lost", "stolen", "suspicious", "employee_exit"
-}
-
-export class RevokeDeviceUseCase {
-  constructor(
-    private deviceRepository: IDeviceRepository,
-    private envelopeRepository: IEnvelopeRepository,
-    private auditLogRepository: IAuditLogRepository
-  ) {}
-
-  async execute(input: RevokeDeviceInput): Promise<void> {
-    const { userId, deviceId, reason } = input;
-
-    // 1. Verifica se dispositivo existe e pertence ao usuário
-    const device = await this.deviceRepository.findByDeviceId(deviceId);
-
-    if (!device) {
-      throw new NotFoundError("Device not found");
-    }
-
-    if (device.userId !== userId) {
-      throw new ForbiddenError("Device does not belong to this user");
-    }
-
-    if (device.status === "revoked") {
-      throw new AppError("Device is already revoked");
-    }
-
-    // 2. Inicia transação
-    await this.deviceRepository.transaction(async (trx) => {
-      // 2.1. Deleta envelope do dispositivo
-      await this.envelopeRepository.deleteByDeviceId(deviceId, trx);
-
-      // 2.2. Marca dispositivo como revogado
-      await this.deviceRepository.revoke(deviceId, trx);
-
-      // 2.3. Registra log de auditoria
-      await this.auditLogRepository.create(
-        {
-          userId,
-          action: "DEVICE_REVOKED",
-          deviceId,
-          reason: reason || "user_initiated",
-          metadata: {
-            revokedAt: new Date(),
-            revokedBy: userId,
-          },
-        },
-        trx
-      );
-    });
-
-    console.log(`Device ${deviceId} revoked successfully`);
-  }
-}
-```
-
-#### Restauração de Acesso (Re-autorização)
-
-```javascript
-// Se usuário recuperou o dispositivo ou quer restaurar acesso
-
-// 1. No Dispositivo Revogado (ex: Device 2)
-// Usuário faz login normalmente
-const { accessToken } = await login(email, password);
-
-// 2. Tenta buscar envelope (retorna 404)
-const envelopeResponse = await fetch("/api/envelopes/me", {
-  headers: {
-    Authorization: `Bearer ${accessToken}`,
-    "X-Device-Id": "device-2",
-  },
-});
-
-if (envelopeResponse.status === 404) {
-  // 3. Solicita re-autorização
-  alert(
-    "Dispositivo precisa ser autorizado novamente. Solicite de outro dispositivo."
-  );
-
-  // Usuário vai em outro dispositivo (Device 1) e autoriza novamente
-  // Processo é EXATAMENTE o mesmo de adicionar novo dispositivo
-}
-
-// 4. No Dispositivo 1 (Autorizador)
-const pendingDevices = await listPendingDevices();
-// Mostra "device-2" como "pending"
-
-// Usuário aprova novamente
-await createEnvelopeForDevice(device2);
-
-// 5. Novo envelope criado
-// Device 2 pode buscar envelope e recuperar MDK
-// Device 2 volta a funcionar normalmente
-```
-
-**Importante:**
-
-- Dispositivo revogado pode ser re-autorizado
-- Processo de re-autorização é idêntico a adicionar novo dispositivo
-- Novo envelope é criado com a mesma MDK
-- Dispositivo recupera acesso total aos arquivos
-
-#### Boas Práticas de Segurança
-
-**Para Usuários:**
-
-1. ✅ **Revogue imediatamente** dispositivos perdidos/roubados
-2. ✅ **Troque a senha** após revogar (invalida tokens JWT)
-3. ✅ **Revise dispositivos regularmente** (ex: mensalmente)
-4. ✅ **Mantenha pelo menos 2 dispositivos ativos** (para não ficar sem acesso)
-5. ✅ **Use nomes descritivos** para dispositivos (ex: "iPhone João", "Laptop Trabalho")
-
-**Para Desenvolvedores:**
-
-1. ✅ **Use transações** ao revogar (deletar envelope + atualizar device)
-2. ✅ **Registre logs de auditoria** (quem revogou, quando, por quê)
-3. ✅ **Notifique usuário** quando dispositivo é revogado
-4. ✅ **Implemente confirmação dupla** para revogação
-5. ✅ **Permita visualizar histórico** de dispositivos revogados
-
-#### Monitoramento e Alertas
-
-```javascript
-// Sistema de alertas quando dispositivo é revogado
-
-// 1. Enviar email ao usuário
-await emailService.send({
-  to: user.email,
-  subject: "⚠️ Dispositivo Revogado",
-  body: `
-    Um dispositivo foi revogado da sua conta:
-    
-    Dispositivo: ${device.name || device.deviceId}
-    Revogado em: ${new Date().toISOString()}
-    Revogado por: ${revokedBy}
-    
-    Se você não reconhece esta ação, sua conta pode estar comprometida.
-    Recomendamos:
-    1. Trocar sua senha imediatamente
-    2. Revisar todos os dispositivos autorizados
-    3. Ativar autenticação de dois fatores (2FA)
-  `,
-});
-
-// 2. Notificar outros dispositivos via WebSocket
-await websocketService.broadcast(userId, {
-  type: "DEVICE_REVOKED",
-  deviceId: device.deviceId,
-  revokedAt: new Date(),
-});
-
-// 3. Registrar em log de segurança
-await securityLogRepository.create({
-  userId,
-  event: "DEVICE_REVOKED",
-  severity: "MEDIUM",
-  details: {
-    deviceId,
-    reason,
-    ipAddress: request.ip,
-  },
-});
-```
-
----
-
-### Casos de Uso Práticos
-
-#### Cenário 1: Adicionar Laptop de Trabalho
-
-```
-1. Usuário faz login no laptop de trabalho (Dispositivo 2)
-2. Laptop gera chaves e se registra como "pending"
-3. Usuário recebe notificação no celular (Dispositivo 1)
-4. Usuário aprova o laptop no celular
-5. Laptop recebe MDK e pode acessar arquivos
-```
-
-#### Cenário 2: Perda/Roubo de Dispositivo (COM REVOGAÇÃO DETALHADA)
-
-```
-Timeline Completa:
-
-10:00 - Usuário perde celular (Dispositivo 2) no metrô
-10:15 - Usuário percebe que perdeu o celular
-10:20 - Usuário acessa laptop (Dispositivo 1)
-10:21 - Usuário abre app e vê lista de dispositivos:
-        ✅ Device 1 (Laptop) - Ativo - Último acesso: agora
-        ⚠️  Device 2 (Celular) - Ativo - Último acesso: 10:00
-        ✅ Device 3 (Tablet) - Ativo - Último acesso: ontem
-10:22 - Usuário clica em "Revogar" no Device 2
-10:23 - Sistema pede confirmação:
-        "⚠️ Revogar Device 2 (Celular)?
-         Este dispositivo perderá acesso imediato aos arquivos.
-         Não é possível desfazer."
-10:24 - Usuário confirma
-10:25 - Sistema executa:
-        ✅ Deleta envelope2 do banco
-        ✅ Marca Device 2 como "revoked"
-        ✅ Registra log de auditoria
-        ✅ Envia email de notificação
-10:26 - Usuário vê confirmação: "Device 2 revogado com sucesso"
-10:30 - Usuário troca senha (invalida tokens JWT)
-10:31 - Sistema invalida todos os tokens do Device 2
-
-Resultado Final:
-- ✅ Device 1 (Laptop): Funcionando normalmente
-- ❌ Device 2 (Celular): Revogado, sem acesso
-- ✅ Device 3 (Tablet): Funcionando normalmente
-
-Se alguém encontrar o celular:
-- ❌ Não consegue fazer novo login (senha trocada)
-- ❌ Se já estava logado, não consegue buscar envelope (deletado)
-- ❌ Não pode baixar novos arquivos (API retorna 403)
-- ⚠️  Arquivos já baixados no celular ainda acessíveis (mas usuário já trocou senha)
-```
-
-#### Cenário 3: Múltiplos Dispositivos
-
-```
-Usuário pode ter:
-- Celular pessoal (Dispositivo 1) - ativo
-- Laptop de trabalho (Dispositivo 2) - ativo
-- Tablet (Dispositivo 3) - ativo
-- Desktop casa (Dispositivo 4) - ativo
-
-Cada um tem:
-- Seu próprio par de chaves (pub/priv)
-- Seu próprio envelope (MDK crypto c/ sua publicKey)
-- A MESMA MDK descriptografada
-- Acesso aos MESMOS arquivos
-
-Servidor armazena:
-- 4 envelopes diferentes
-- Todos com a MESMA MDK (criptografada diferentemente)
-```
-
----
-
-### Implementação Completa no Cliente
-
-```javascript
-// Helper Functions
-
-async function exportPublicKeyToPEM(publicKey) {
-  const exported = await crypto.subtle.exportKey("spki", publicKey);
-  const exportedAsBase64 = btoa(
-    String.fromCharCode(...new Uint8Array(exported))
-  );
-  return `-----BEGIN PUBLIC KEY-----\n${exportedAsBase64}\n-----END PUBLIC KEY-----`;
-}
-
-async function importPublicKeyFromPEM(pem) {
-  const pemContents = pem
-    .replace("-----BEGIN PUBLIC KEY-----", "")
-    .replace("-----END PUBLIC KEY-----", "")
-    .replace(/\s/g, "");
-  const binaryDer = atob(pemContents);
-  const bytes = new Uint8Array(binaryDer.length);
-  for (let i = 0; i < binaryDer.length; i++) {
-    bytes[i] = binaryDer.charCodeAt(i);
-  }
-  return await crypto.subtle.importKey(
-    "spki",
-    bytes.buffer,
-    {
-      name: "RSA-OAEP",
-      hash: "SHA-256",
-    },
-    true,
-    ["encrypt"]
-  );
-}
-
-function bufferToBase64(buffer) {
-  return btoa(String.fromCharCode(...new Uint8Array(buffer)));
-}
-
-function base64ToBuffer(base64) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes.buffer;
-}
-
-// Main Flow
-async function authorizeNewDevice() {
-  // No Dispositivo 1 (Autorizador)
-
-  const pendingDevices = await listPendingDevices();
-
-  if (pendingDevices.length === 0) {
-    console.log("Nenhum dispositivo pendente");
-    return;
-  }
-
-  for (const device of pendingDevices) {
-    const confirmed = confirm(`Autorizar dispositivo ${device.deviceId}?`);
-
-    if (confirmed) {
-      await createEnvelopeForDevice(device);
-    }
-  }
-}
-
-async function createEnvelopeForDevice(device) {
-  // 1. Recupera MDK local
-  const mdk = window.maask.mdk;
-
-  // 2. Busca chave pública do novo dispositivo
-  const deviceInfo = await fetch(`/api/devices/${device.id}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  }).then((r) => r.json());
-
-  // 3. Importa chave pública
-  const publicKey = await importPublicKeyFromPEM(deviceInfo.data.publicKey);
-
-  // 4. Criptografa MDK
-  const encryptedMdk = await crypto.subtle.encrypt(
-    { name: "RSA-OAEP" },
-    publicKey,
-    mdk
-  );
-
-  // 5. Cria envelope
-  await fetch("/api/envelopes", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      deviceId: device.deviceId,
-      envelopeCiphertext: bufferToBase64(encryptedMdk),
-      encryptionMetadata: {
-        algorithm: "RSA-OAEP",
-        hashFunction: "SHA-256",
-      },
-    }),
-  });
-
-  console.log(`✅ Dispositivo ${device.deviceId} autorizado!`);
-}
-```
-
----
-
-### Resumo
-
-**Como Dispositivo 2 consegue a MDK sem ter privateKey1?**
-
-1. ✅ Dispositivo 2 gera **seu próprio par de chaves** (publicKey2 + privateKey2)
-2. ✅ Dispositivo 1 (que já tem MDK) **cria um novo envelope** criptografando a MDK com publicKey2
-3. ✅ Servidor armazena **envelope2** (MDK criptografada com publicKey2)
-4. ✅ Dispositivo 2 busca **envelope2** e descriptografa com **sua própria privateKey2**
-
-**Resultado:** Ambos os dispositivos têm a mesma MDK, mas cada um usa sua própria chave privada!
-
-Isso é chamado de **Envelope Encryption** ou **Key Wrapping**, e é exatamente como serviços como 1Password, Bitwarden, Signal, WhatsApp, etc. funcionam para permitir múltiplos dispositivos com E2EE. 🎉
-
----
-
-## Fluxo de Revogação Segura de Dispositivos
-
-### 🔒 Por Que Revogação com Senha é Crítica
-
-**Cenário de ataque SEM proteção:**
-
-```
-10:00 - Ladrão rouba Device 2 (ainda "active")
-10:15 - Ladrão acessa app antes do dono revogar
-10:16 - Ladrão revoga TODOS os outros dispositivos do usuário
-10:17 - Dono perde acesso COMPLETO à conta! 😱
-```
-
-**Com revogação segura implementada:**
-
-```
-10:00 - Ladrão rouba Device 2
-10:15 - Ladrão tenta revogar outros dispositivos
-10:16 - ❌ Sistema exige SENHA (ladrão não tem)
-10:17 - ❌ Sistema valida status do Device 2 no banco
-10:18 - ✅ Dono revoga Device 2 de outro dispositivo
-10:19 - ❌ Device 2 BLOQUEADO completamente
-```
-
-### Passo a Passo: Revogação Segura
-
-#### 1️⃣ Usuário Identifica Dispositivo Suspeito
-
-```javascript
-// No Dispositivo 1 (Confiável)
-
-// 1. Lista todos os dispositivos
-const response = await fetch("/api/devices", {
-  headers: {
-    Authorization: `Bearer ${accessToken}`,
-  },
-});
-
-const { devices } = await response.json();
-console.log("Meus dispositivos:", devices);
-// [
-//   { id: "1", deviceId: "device-1", status: "active", isMasterDevice: true, lastSeen: "2025-10-14T10:00:00Z" },
-//   { id: "2", deviceId: "device-2", status: "active", isMasterDevice: false, lastSeen: "2025-10-13T15:30:00Z" },
-//   { id: "3", deviceId: "device-3", status: "active", isMasterDevice: false, lastSeen: "2025-10-10T08:20:00Z" }
-// ]
-
-// 2. Usuário identifica dispositivo suspeito
-const suspiciousDevice = devices.find((d) => d.deviceId === "device-2");
-```
-
-#### 2️⃣ Sistema Pede Confirmação e Senha
-
-```javascript
-// 3. UI mostra confirmação
-const confirmed = confirm(
-  `⚠️ ATENÇÃO: Revogar dispositivo ${suspiciousDevice.deviceId}?\n\n` +
-    `Este dispositivo perderá acesso IMEDIATO a todos os arquivos.\n` +
-    `Esta ação NÃO pode ser desfeita.\n\n` +
-    `Para continuar, você precisará digitar sua senha.`
-);
-
-if (!confirmed) {
-  console.log("❌ Revogação cancelada");
-  return;
-}
-
-// 4. UI solicita senha
-const password = prompt("Digite sua senha para confirmar a revogação:");
-
-if (!password) {
-  alert("Senha é obrigatória para revogar dispositivo");
-  return;
-}
-```
-
-#### 3️⃣ Backend Valida Múltiplas Camadas
-
-```javascript
-// 5. Envia requisição de revogação
-const revokeResponse = await fetch("/api/devices/revoke", {
-  method: "POST",
-  headers: {
-    Authorization: `Bearer ${accessToken}`,
-    "X-Device-Id": "device-1", // Dispositivo atual
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    deviceId: "device-2", // Dispositivo a revogar
-    password: password, // Senha do usuário
-    reason: "suspicious", // Motivo
-  }),
-});
-
-if (!revokeResponse.ok) {
-  const error = await revokeResponse.json();
-
-  if (revokeResponse.status === 401) {
-    alert("❌ Senha incorreta! Revogação negada.");
-  } else if (revokeResponse.status === 403) {
-    alert("❌ Você não tem permissão para revogar este dispositivo.");
-  } else if (revokeResponse.status === 400) {
-    alert("❌ Erro: " + error.error);
-  }
-
-  return;
-}
-
-const result = await revokeResponse.json();
-console.log("✅ Dispositivo revogado:", result);
-alert(
-  "Dispositivo revogado com sucesso! Ele não pode mais acessar seus arquivos."
-);
-```
-
-#### 4️⃣ Backend Executa Validações de Segurança
-
-```typescript
-// No Backend - RevokeDeviceUseCase.ts
-
-async execute(input: RevokeDeviceInput): Promise<void> {
-  // VALIDAÇÃO 1: Verifica senha do usuário
-  const user = await this.userRepository.findById(input.userId);
-  const isPasswordValid = await argon2.verify(user.password, input.password, {
-    secret: Buffer.from(config.security.pepper),
-  });
-
-  if (!isPasswordValid) {
-    throw new AppError('Invalid password. Revocation denied.');
-  }
-
-  // VALIDAÇÃO 2: Busca dispositivo ATUAL (quem está revogando)
-  const currentDevice = await this.deviceRepository.findByDeviceId(
-    input.currentDeviceId
-  );
-
-  if (!currentDevice.isActive()) {
-    throw new AppError('Current device is not active');
-  }
-
-  // VALIDAÇÃO 3: Busca dispositivo ALVO (a ser revogado)
-  const deviceToRevoke = await this.deviceRepository.findByDeviceId(
-    input.deviceIdToRevoke
-  );
-
-  if (deviceToRevoke.status === 'revoked') {
-    throw new AppError('Device is already revoked');
-  }
-
-  // VALIDAÇÃO 4: Dispositivo não pode revogar a si mesmo
-  if (input.deviceIdToRevoke === input.currentDeviceId) {
-    throw new AppError('Cannot revoke your current device');
-  }
-
-  // VALIDAÇÃO 5: Hierarquia de master devices
-  if (deviceToRevoke.isMaster() && !currentDevice.isMaster()) {
-    throw new AppError('Only master devices can revoke other master devices');
-  }
-
-  // VALIDAÇÃO 6: Não pode revogar último master device
-  if (deviceToRevoke.isMaster()) {
-    const masterCount = await this.deviceRepository.countMasterDevices(input.userId);
-    if (masterCount <= 1) {
-      throw new AppError('Cannot revoke the last master device');
-    }
-  }
-
-  // EXECUÇÃO: Revoga dispositivo em transação
-  await this.envelopeRepository.deleteByDeviceId(deviceToRevoke.id);
-  await this.deviceRepository.revoke(deviceToRevoke.id, {
-    revokedBy: input.currentDeviceId,
-    reason: input.reason || 'user_initiated',
-  });
-
-  console.log(`Device ${input.deviceIdToRevoke} revoked successfully`);
-}
-```
-
-### Diagrama de Sequência Completo
-
-```
-Device 1 (Confiável)         Backend                  Banco de Dados
-      |                         |                            |
-      |-- 1. GET /devices ----->|                            |
-      |                         |-- 2. Query devices ------->|
-      |<- 3. Lista devices -----|                            |
-      |   (device-1, device-2)  |                            |
-      |                         |                            |
-      |-- 4. POST /revoke ----->|                            |
-      |   Headers: {            |                            |
-      |     X-Device-Id: dev-1  |                            |
-      |   }                     |                            |
-      |   Body: {               |                            |
-      |     deviceId: "dev-2",  |                            |
-      |     password: "***",    |                            |
-      |     reason: "stolen"    |                            |
-      |   }                     |                            |
-      |                         |                            |
-      |                         |-- 5. Busca user ---------->|
-      |                         |<- 6. Retorna user ---------|
-      |                         |                            |
-      |                         |-- 7. Verifica senha ------>|
-      |                         |    (Argon2 + pepper)       |
-      |                         |    ✅ Senha válida         |
-      |                         |                            |
-      |                         |-- 8. Busca Device 1 ------>|
-      |                         |<- 9. Device 1 active ------|
-      |                         |    ✅ Pode revogar         |
-      |                         |                            |
-      |                         |-- 10. Busca Device 2 ----->|
-      |                         |<- 11. Device 2 active -----|
-      |                         |                            |
-      |                         |-- 12. Valida hierarquia -->|
-      |                         |    ✅ Permissões OK        |
-      |                         |                            |
-      |                         |-- 13. DELETE envelope2 --->|
-      |                         |    ✅ Envelope deletado    |
-      |                         |                            |
-      |                         |-- 14. UPDATE device2 ----->|
-      |                         |    SET status='revoked'    |
-      |                         |    ✅ Device revogado      |
-      |                         |                            |
-      |<- 15. Success ----------|                            |
-      |   { message, data }     |                            |
-```
-
-### Estado do Banco Após Revogação
-
-**Antes:**
-
-```sql
--- devices
-id | device_id | status   | is_master | revoked_at | revoked_by
----+-----------+----------+-----------+------------+------------
-1  | device-1  | active   | 1         | NULL       | NULL
-2  | device-2  | active   | 0         | NULL       | NULL
-3  | device-3  | active   | 0         | NULL       | NULL
-
--- envelopes
-id | device_id | envelope_ciphertext
----+-----------+---------------------
-1  | 1         | [MDK crypto c/ pub1]
-2  | 2         | [MDK crypto c/ pub2]
-3  | 3         | [MDK crypto c/ pub3]
-```
-
-**Depois (device-2 revogado):**
-
-```sql
--- devices
-id | device_id | status   | is_master | revoked_at          | revoked_by
----+-----------+----------+-----------+---------------------+------------
-1  | device-1  | active   | 1         | NULL                | NULL
-2  | device-2  | revoked  | 0         | 2025-10-14 10:05:00 | device-1  ← REVOGADO
-3  | device-3  | active   | 0         | NULL                | NULL
-
--- envelopes (envelope2 DELETADO!)
-id | device_id | envelope_ciphertext
----+-----------+---------------------
-1  | 1         | [MDK crypto c/ pub1]
-3  | 3         | [MDK crypto c/ pub3]
-                ← envelope2 REMOVIDO!
-```
-
 ### O Que Acontece com Device 2 Revogado?
 
 #### ❌ Tentativas Bloqueadas
@@ -2253,281 +1454,3 @@ Resultado:
 ❌ Atacante perde acesso imediato
 ✅ Novos arquivos estão seguros
 ```
-
-### Re-autorização (Recuperar Acesso)
-
-Se o usuário recuperar o dispositivo ou quiser restaurar o acesso:
-
-```javascript
-// 1. No dispositivo revogado: fazer login
-const { accessToken } = await login(email, password);
-
-// 2. Tentar buscar envelope (retorna 404)
-const response = await fetch("/api/envelopes/me", {
-  headers: {
-    Authorization: `Bearer ${accessToken}`,
-    "X-Device-Id": "device-2",
-  },
-});
-
-if (response.status === 404) {
-  alert("Dispositivo precisa ser autorizado novamente");
-}
-
-// 3. No dispositivo autorizado: criar novo envelope
-// (Processo IDÊNTICO ao de adicionar novo dispositivo)
-await createEnvelopeForDevice(device2);
-
-// Device 2 volta a funcionar normalmente! ✅
-```
-
-### Resumo de Segurança
-
-**Por que dispositivo revogado não pode atacar?**
-
-1. ✅ **Requer senha** → Ladrão não tem
-2. ✅ **Backend valida status** → Revogado = bloqueado
-3. ✅ **Não pode auto-revogar** → Requer outro dispositivo
-4. ✅ **Hierarquia de masters** → Protege dispositivos principais
-5. ✅ **Último master protegido** → Previne lockout
-6. ✅ **Transação atômica** → Sem estados inconsistentes
-7. ✅ **Auditoria completa** → Rastreabilidade total
-
-**Resultado:** Sistema **completamente seguro** contra dispositivos comprometidos! 🔒
-
----
-
-## Diagramas de Sequência
-
-### Upload Completo
-
-```
-Cliente                    API                     PostgreSQL           S3/MinIO
-  |                         |                          |                  |
-  |--1. POST /upload/init-->|                          |                  |
-  |                         |--2. Generate IDs-------->|                  |
-  |                         |--3. Generate URL---------|----------------->|
-  |<-4. uploadId, presigned-|                          |                  |
-  |                         |                          |                  |
-  |--5. Encrypt file------->|                          |                  |
-  |(client-side)            |                          |                  |
-  |                         |                          |                  |
-  |--6. PUT encrypted file--|--------------------------|----------------->|
-  |                         |                          |                  |
-  |--7. POST /complete----->|                          |                  |
-  |                         |--8. Verify file----------|----------------->|
-  |                         |--9. Save metadata------->|                  |
-  |<-10. Success------------|                          |                  |
-```
-
-### Download Completo
-
-```
-Cliente                    API                     PostgreSQL           S3/MinIO
-  |                         |                          |                  |
-  |--1. GET /files--------->|                          |                  |
-  |                         |--2. Query files--------->|                  |
-  |<-3. File list-----------|                          |                  |
-  |                         |                          |                  |
-  |--4. GET /file/123------>|                          |                  |
-  |   /download             |                          |                  |
-  |                         |--5. Query file---------->|                  |
-  |                         |--6. Check exists---------|----------------->|
-  |                         |--7. Generate URL---------|----------------->|
-  |<-8. presignedUrl +------|                          |                  |
-  |   encryptedFek          |                          |                  |
-  |                         |                          |                  |
-  |--9. Decrypt FEK-------->|                          |                  |
-  |(client-side, using MDK) |                          |                  |
-  |                         |                          |                  |
-  |--10. GET encrypted file-|--------------------------|----------------->|
-  |                         |                          |                  |
-  |--11. Decrypt file------>|                          |                  |
-  |(client-side, using FEK) |                          |                  |
-  |                         |                          |                  |
-  |--12. Save file--------->|                          |                  |
-```
-
-### Autenticação e Acesso
-
-```
-Cliente                    API                     PostgreSQL
-  |                         |                          |
-  |--1. POST /login-------->|                          |
-  |                         |--2. Find user----------->|
-  |                         |--3. Verify password----->|
-  |<-4. JWT tokens----------|                          |
-  |                         |                          |
-  |--5. POST /devices------>|                          |
-  |   (with JWT)            |                          |
-  |                         |--6. Verify JWT---------->|
-  |                         |--7. Save device--------->|
-  |<-8. Device registered---|                          |
-  |                         |                          |
-  |--9. POST /envelopes---->|                          |
-  |   (with JWT + MDK)      |                          |
-  |                         |--10. Verify JWT--------->|
-  |                         |--11. Verify device------>|
-  |                         |--12. Save envelope------>|
-  |<-13. Envelope saved-----|                          |
-```
-
----
-
-## Segurança e Boas Práticas
-
-### Zero-Knowledge no Servidor
-
-✅ **O que o servidor NUNCA vê:**
-
-- MDK (Master Decryption Key)
-- FEK descriptografada
-- Conteúdo dos arquivos em texto plano
-- Chaves privadas dos dispositivos
-
-✅ **O que o servidor armazena:**
-
-- Chaves públicas dos dispositivos
-- MDK criptografada (envelopes)
-- FEK criptografada (metadados de arquivos)
-- Arquivos criptografados (S3)
-- Metadados (nomes, tamanhos, datas)
-
-### Camadas de Criptografia
-
-```
-Arquivo Original (texto plano)
-    ↓ [Criptografa com FEK - AES-256-GCM]
-Arquivo Criptografado (armazenado no S3)
-    ↑
-FEK (chave do arquivo)
-    ↓ [Criptografa com MDK - AES-256-GCM]
-FEK Criptografada (armazenada no PostgreSQL)
-    ↑
-MDK (chave mestra)
-    ↓ [Criptografa com Public Key - RSA-OAEP]
-Envelope (armazenado no PostgreSQL)
-    ↑
-Private Key (apenas no dispositivo)
-```
-
-### Verificação de Integridade
-
-- **AuthTag do AES-GCM**: Garante que o arquivo não foi alterado
-- **Presigned URLs**: Expiram em 1 hora, limitando janela de ataque
-- **JWT**: Expira em 15 minutos, limitando tempo de sessão
-- **Device Status**: Dispositivos podem ser revogados com senha
-
-### Arquitetura de Segurança Completa
-
-```
-┌────────────────────────────────────────────────────────────────┐
-│                   CAMADAS DE SEGURANÇA                         │
-├────────────────────────────────────────────────────────────────┤
-│                                                                │
-│  NÍVEL 1: Criptografia de Arquivos                            │
-│  ┌──────────────────────────────────────────────────┐         │
-│  │ Arquivo → [AES-256-GCM + FEK] → Arquivo Crypto  │         │
-│  │ FEK → [AES-256-GCM + MDK] → FEK Crypto          │         │
-│  │ MDK → [RSA-4096-OAEP + PubKey] → Envelope       │         │
-│  └──────────────────────────────────────────────────┘         │
-│                                                                │
-│  NÍVEL 2: Autenticação e Autorização                          │
-│  ┌──────────────────────────────────────────────────┐         │
-│  │ Senha → [Argon2 + Pepper + Salt] → Hash         │         │
-│  │ Login → [JWT + Secret] → AccessToken (15min)    │         │
-│  │ Refresh → [JWT + Secret] → RefreshToken (7d)    │         │
-│  └──────────────────────────────────────────────────┘         │
-│                                                                │
-│  NÍVEL 3: Controle de Dispositivos                            │
-│  ┌──────────────────────────────────────────────────┐         │
-│  │ ✅ Status Validation (active/inactive/revoked)   │         │
-│  │ ✅ Master Device Hierarchy                       │         │
-│  │ ✅ Password-Protected Revocation                 │         │
-│  │ ✅ Cannot Self-Revoke                            │         │
-│  │ ✅ Last Master Protection                        │         │
-│  └──────────────────────────────────────────────────┘         │
-│                                                                │
-│  NÍVEL 4: Transporte e Armazenamento                          │
-│  ┌──────────────────────────────────────────────────┐         │
-│  │ HTTPS/TLS 1.3 (em trânsito)                     │         │
-│  │ Presigned URLs (1 hora de validade)             │         │
-│  │ S3 Encryption at Rest                            │         │
-│  │ PostgreSQL + SSL                                 │         │
-│  └──────────────────────────────────────────────────┘         │
-│                                                                │
-│  NÍVEL 5: Auditoria e Monitoramento                           │
-│  ┌──────────────────────────────────────────────────┐         │
-│  │ Logs de Revogação (quem, quando, por quê)       │         │
-│  │ Device Activity Tracking (lastSeen)             │         │
-│  │ Security Events (login, logout, upload)         │         │
-│  │ Failed Access Attempts                           │         │
-│  └──────────────────────────────────────────────────┘         │
-│                                                                │
-└────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Troubleshooting
-
-### Upload Falha
-
-**Problema**: Upload para S3 retorna 403 Forbidden
-
-- **Causa**: Presigned URL expirou (1 hora)
-- **Solução**: Reiniciar fluxo de upload (POST /upload/init)
-
-**Problema**: CompleteUpload retorna 404
-
-- **Causa**: Arquivo não foi enviado ao S3
-- **Solução**: Verificar se PUT para presignedUrl foi bem-sucedido
-
-### Download Falha
-
-**Problema**: Não consigo descriptografar arquivo
-
-- **Causa 1**: MDK incorreta
-  - Verificar se envelope foi recuperado corretamente
-- **Causa 2**: FEK incorreta
-  - Verificar se authTag corresponde
-- **Causa 3**: Arquivo corrompido
-  - Verificar integridade no S3
-
-### Dispositivo Não Autorizado
-
-**Problema**: GetEnvelope retorna 404
-
-- **Causa**: Envelope não foi criado para este dispositivo
-- **Solução**: Autorizar dispositivo de outro dispositivo já autorizado
-
----
-
-## Conclusão
-
-O sistema implementa criptografia ponta a ponta completa, garantindo que:
-
-1. ✅ **Dados nunca vazam**: Servidor nunca vê dados em texto plano
-2. ✅ **Múltiplos dispositivos**: Via envelope encryption
-3. ✅ **Performance**: Presigned URLs para upload/download direto
-4. ✅ **Escalabilidade**: S3 para storage, PostgreSQL para metadados
-5. ✅ **Segurança**: Múltiplas camadas de criptografia
-6. ✅ **Auditoria**: Logs de todas as operações
-7. ✅ **Revogação segura**: Dispositivos comprometidos são bloqueados completamente
-8. ✅ **Hierarquia de dispositivos**: Master devices protegem a conta
-
-### Proteções Contra Dispositivos Comprometidos
-
-- ❌ Dispositivo revogado **NÃO** pode criar novos envelopes
-- ❌ Dispositivo revogado **NÃO** pode revogar outros dispositivos
-- ❌ Dispositivo revogado **NÃO** pode fazer upload/download de arquivos
-- ❌ Dispositivo revogado **NÃO** pode se reativar sozinho
-- ✅ Todas as revogações requerem **senha do usuário**
-- ✅ Backend **sempre valida** status do dispositivo no banco de dados
-- ✅ Sistema tem **auditoria completa** de todas as operações
-
-Para mais detalhes técnicos, consulte:
-
-- `docs/e2e-file-encryption.md` - Arquitetura completa de criptografia
-- `docs/device-revocation-security.md` - Segurança detalhada da revogação
-- `docs/IMPLEMENTATION-SUMMARY.md` - Resumo completo da implementação
