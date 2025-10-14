@@ -6,16 +6,12 @@ import {
   getDownloadUrl 
 } from '../services/api';
 import {
-  generateFEK,
-  generateIV,
+  importCriptographyCode,
   encryptWithAES,
   decryptWithAES,
-  exportSymmetricKey,
-  arrayBufferToBase64,
-  base64ToArrayBuffer,
-  importSymmetricKey,
+  generateIV,
 } from '../utils/crypto';
-import { getMDKFromMemory } from '../utils/storage';
+import { getCriptographyCode } from '../utils/storage';
 
 interface FileMetadata {
   fileId: string;
@@ -52,12 +48,13 @@ export default function FileManager() {
     setUploadProgress(0);
 
     try {
-      const mdk = getMDKFromMemory();
-      if (!mdk) {
-        throw new Error('MDK não encontrada na memória. Faça o setup do dispositivo.');
+      // 1. Obter criptografyCode do usuário
+      const criptografiaCode = getCriptographyCode();
+      if (!criptografiaCode) {
+        throw new Error('CriptographyCode não encontrada. Faça login novamente.');
       }
 
-      // Passo 1: Iniciar upload
+      // 2. Iniciar upload
       setMessage(`📤 Iniciando upload de ${file.name}...`);
       const initResponse = await initUpload({
         fileName: file.name,
@@ -66,67 +63,45 @@ export default function FileManager() {
       });
       setUploadProgress(10);
 
-      // Passo 2: Gerar FEK e IV
-      setMessage('🔑 Gerando chave de criptografia do arquivo...');
-      const fek = await generateFEK();
-      const iv = generateIV();
+      // 3. Importar criptografyCode como chave AES
+      setMessage('🔑 Preparando criptografia...');
+      const cryptoKey = await importCriptographyCode(criptografiaCode);
       setUploadProgress(20);
 
-      // Passo 3: Ler e criptografar arquivo
+      // 4. Ler e criptografar arquivo
       setMessage('🔒 Criptografando arquivo...');
       const fileBuffer = await file.arrayBuffer();
-      const { ciphertext, authTag } = await encryptWithAES(fileBuffer, fek, iv);
+      const iv = generateIV();
+      const { ciphertext } = await encryptWithAES(fileBuffer, cryptoKey, iv);
       setUploadProgress(50);
 
-      // Passo 4: Upload para S3
-      setMessage('☁️ Enviando arquivo criptografado para armazenamento...');
+      // 5. Combinar IV + dados criptografados
+      const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+      combined.set(iv, 0);
+      combined.set(new Uint8Array(ciphertext), iv.length);
+
+      // 6. Upload para Supabase Storage
+      setMessage('☁️ Enviando arquivo criptografado...');
       const uploadResponse = await fetch(initResponse.data.presignedUrl, {
         method: 'PUT',
-        body: ciphertext,
-        // Removendo headers para evitar preflight CORS
+        body: combined,
+        headers: {
+          'Content-Type': 'application/octet-stream',
+        },
       });
 
       if (!uploadResponse.ok) {
-        throw new Error('Falha no upload para S3');
+        throw new Error('Falha no upload para armazenamento');
       }
       setUploadProgress(80);
 
-      // Passo 5: Criptografar FEK com MDK
-      setMessage('🔐 Protegendo chave do arquivo com MDK...');
-      const fekBase64 = await exportSymmetricKey(fek);
-      const fekBuffer = base64ToArrayBuffer(fekBase64);
-      const fekIv = generateIV();
-      const { ciphertext: encryptedFek, authTag: fekAuthTag } = await encryptWithAES(
-        fekBuffer,
-        mdk,
-        fekIv
-      );
-      console.log('[Upload] FEK criptografada com MDK:', {
-        fekSize: fekBuffer.byteLength,
-        encryptedFekSize: encryptedFek.byteLength,
-        fekIvSize: fekIv.byteLength,
-        fekAuthTagSize: fekAuthTag.byteLength,
-      });
-      setUploadProgress(90);
-
-      // Passo 6: Completar upload
+      // 7. Completar upload
       setMessage('✔️ Finalizando upload...');
       await completeUpload({
         uploadId: initResponse.data.uploadId,
         fileId: initResponse.data.fileId,
         fileName: file.name,
         fileSize: file.size,
-        encryptedFek: arrayBufferToBase64(encryptedFek),
-        fekEncryptionMetadata: {
-          algorithm: 'AES-256-GCM',
-          iv: arrayBufferToBase64(fekIv.buffer as ArrayBuffer),
-          authTag: arrayBufferToBase64(fekAuthTag.buffer as ArrayBuffer),
-        },
-        fileEncryptionMetadata: {
-          algorithm: 'AES-256-GCM',
-          iv: arrayBufferToBase64(iv.buffer as ArrayBuffer),
-          authTag: arrayBufferToBase64(authTag.buffer as ArrayBuffer),
-        },
       });
       setUploadProgress(100);
 
@@ -149,88 +124,65 @@ export default function FileManager() {
 
     try {
       console.log('[Download] Iniciando download para', fileId, fileName);
-      const mdk = getMDKFromMemory();
-      if (!mdk) {
-        console.error('[Download] MDK não encontrada na memória');
-        throw new Error('MDK não encontrada na memória. Faça o setup do dispositivo.');
+
+      // 1. Obter criptografyCode do usuário
+      const criptografiaCode = getCriptographyCode();
+      if (!criptografiaCode) {
+        console.error('[Download] CriptographyCode não encontrada');
+        throw new Error('CriptographyCode não encontrada. Faça login novamente.');
       }
 
-      // Passo 1: Obter URL e metadados
+      // 2. Solicitar URL de download
       setMessage(`📥 Solicitando download de ${fileName}...`);
       const downloadResponse = await getDownloadUrl(fileId);
       console.log('[Download] Resposta da API:', downloadResponse);
 
-      // Passo 2: Descriptografar FEK com MDK
-      setMessage('🔓 Descriptografando chave do arquivo...');
-      let encryptedFekBuffer, fekIv, fekAuthTag, fekBuffer, fekBase64, fek;
-      try {
-        encryptedFekBuffer = base64ToArrayBuffer(downloadResponse.data.encryptedFek);
-        fekIv = new Uint8Array(base64ToArrayBuffer(downloadResponse.data.fekEncryptionMetadata.iv));
-        fekAuthTag = new Uint8Array(base64ToArrayBuffer(downloadResponse.data.fekEncryptionMetadata.authTag));
-        fekBuffer = await decryptWithAES(encryptedFekBuffer, mdk, fekIv, fekAuthTag);
-        fekBase64 = arrayBufferToBase64(fekBuffer);
-        fek = await importSymmetricKey(fekBase64);
-        console.log('[Download] FEK descriptografada com sucesso');
-      } catch (err) {
-        console.error('[Download] Erro ao descriptografar FEK:', err);
-        throw new Error('Erro ao descriptografar FEK: ' + (err instanceof Error ? err.message : String(err)));
-      }
+      // 3. Importar criptografyCode como chave AES
+      setMessage('🔑 Preparando descriptografia...');
+      const cryptoKey = await importCriptographyCode(criptografiaCode);
 
-      // Passo 3: Download do arquivo criptografado
+      // 4. Download do arquivo criptografado
       setMessage('☁️ Baixando arquivo criptografado...');
-      let fileResponse, encryptedFileBuffer;
-      try {
-        fileResponse = await fetch(downloadResponse.data.presignedUrl);
-        if (!fileResponse.ok) {
-          const text = await fileResponse.text();
-          console.error('[Download] Erro HTTP ao baixar arquivo:', fileResponse.status, text);
-          throw new Error(`Falha ao baixar arquivo: HTTP ${fileResponse.status} - ${text}`);
-        }
-        encryptedFileBuffer = await fileResponse.arrayBuffer();
-        console.log('[Download] Arquivo criptografado baixado, tamanho:', encryptedFileBuffer.byteLength);
-      } catch (err) {
-        console.error('[Download] Erro ao baixar arquivo criptografado:', err);
-        throw new Error('Erro ao baixar arquivo criptografado: ' + (err instanceof Error ? err.message : String(err)));
+      const fileResponse = await fetch(downloadResponse.data.presignedUrl);
+      if (!fileResponse.ok) {
+        const text = await fileResponse.text();
+        console.error('[Download] Erro HTTP ao baixar arquivo:', fileResponse.status, text);
+        throw new Error(`Falha ao baixar arquivo: HTTP ${fileResponse.status} - ${text}`);
       }
+      const encryptedFileBuffer = await fileResponse.arrayBuffer();
+      console.log('[Download] Arquivo criptografado baixado, tamanho:', encryptedFileBuffer.byteLength);
 
-      // Passo 4: Descriptografar arquivo
+      // 5. Separar IV e dados criptografados
       setMessage('🔓 Descriptografando arquivo...');
-      let fileIv, fileAuthTag, decryptedBuffer;
-      try {
-        fileIv = new Uint8Array(base64ToArrayBuffer(downloadResponse.data.fileEncryptionMetadata.iv));
-        fileAuthTag = new Uint8Array(base64ToArrayBuffer(downloadResponse.data.fileEncryptionMetadata.authTag));
-        decryptedBuffer = await decryptWithAES(
-          encryptedFileBuffer,
-          fek,
-          fileIv,
-          fileAuthTag
-        );
-        console.log('[Download] Arquivo descriptografado, tamanho:', decryptedBuffer.byteLength);
-      } catch (err) {
-        console.error('[Download] Erro ao descriptografar arquivo:', err);
-        throw new Error('Erro ao descriptografar arquivo: ' + (err instanceof Error ? err.message : String(err)));
-      }
+      const combined = new Uint8Array(encryptedFileBuffer);
+      const iv = combined.slice(0, 12); // IV é sempre 12 bytes para AES-GCM
+      const encryptedData = combined.slice(12);
 
-      // Passo 5: Fazer download
+      // 6. Descriptografar arquivo
+      const decryptedBuffer = await decryptWithAES(encryptedData.buffer, cryptoKey, iv);
+      console.log('[Download] Arquivo descriptografado, tamanho:', decryptedBuffer.byteLength);
+
+      // 7. Fazer download
       setMessage('💾 Salvando arquivo...');
-      try {
-        const blob = new Blob([decryptedBuffer]);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        a.click();
-        URL.revokeObjectURL(url);
-        console.log('[Download] Download concluído:', fileName);
-      } catch (err) {
-        console.error('[Download] Erro ao salvar arquivo:', err);
-        throw new Error('Erro ao salvar arquivo: ' + (err instanceof Error ? err.message : String(err)));
-      }
+      const blob = new Blob([decryptedBuffer]);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+      console.log('[Download] Download concluído:', fileName);
 
       setMessage(`✅ Arquivo "${fileName}" baixado e descriptografado com sucesso!`);
     } catch (error) {
       console.error('[Download] Erro geral:', error);
-      setMessage(`❌ Erro no download: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      let errorMessage = 'Erro desconhecido';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      setMessage(`❌ Erro no download: ${errorMessage}`);
     } finally {
       setLoading(false);
     }

@@ -12,17 +12,6 @@ export interface DownloadFileOutput {
   fileId: string;
   fileName: string;
   presignedUrl: string;
-  encryptedFek: string;
-  fekEncryptionMetadata: {
-    algorithm: string;
-    iv: string;
-    authTag: string;
-  };
-  fileEncryptionMetadata: {
-    algorithm: string;
-    iv: string;
-    authTag: string;
-  };
   expiresIn: number;
 }
 
@@ -68,9 +57,6 @@ export class DownloadFileUseCase {
       fileId: file.fileId,
       fileName: file.fileName,
       presignedUrl,
-      encryptedFek: file.encryptedFek,
-      fekEncryptionMetadata: file.fekEncryptionMetadata,
-      fileEncryptionMetadata: file.fileEncryptionMetadata,
       expiresIn,
     };
   }

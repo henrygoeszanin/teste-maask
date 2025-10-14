@@ -1,7 +1,7 @@
 import { eq, desc, count } from "drizzle-orm";
 import { db } from "@/infrastructure/databases/connection";
 import { files } from "@/infrastructure/databases/schema";
-import { File, EncryptionMetadata } from "@/domain/entities/Files";
+import { File } from "@/domain/entities/Files";
 import { IFileRepository } from "@/application/interfaces/IFileRepository";
 
 export class FileRepository implements IFileRepository {
@@ -15,9 +15,6 @@ export class FileRepository implements IFileRepository {
         fileName: file.fileName,
         sizeBytes: file.sizeBytes,
         storagePath: file.storagePath,
-        encryptedFek: file.encryptedFek,
-        fekEncryptionMetadata: file.fekEncryptionMetadata,
-        fileEncryptionMetadata: file.fileEncryptionMetadata,
         createdAt: file.createdAt,
         updatedAt: file.updatedAt,
       })
@@ -81,9 +78,6 @@ export class FileRepository implements IFileRepository {
         fileName: file.fileName,
         sizeBytes: file.sizeBytes,
         storagePath: file.storagePath,
-        encryptedFek: file.encryptedFek,
-        fekEncryptionMetadata: file.fekEncryptionMetadata,
-        fileEncryptionMetadata: file.fileEncryptionMetadata,
         updatedAt: file.updatedAt,
       })
       .where(eq(files.id, file.id))
@@ -104,9 +98,6 @@ export class FileRepository implements IFileRepository {
       row.fileName,
       row.sizeBytes,
       row.storagePath,
-      row.encryptedFek,
-      row.fekEncryptionMetadata as EncryptionMetadata,
-      row.fileEncryptionMetadata as EncryptionMetadata,
       row.createdAt,
       row.updatedAt
     );

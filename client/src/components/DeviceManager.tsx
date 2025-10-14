@@ -1,25 +1,19 @@
 import { useState, useEffect } from 'react';
-import {
-  listDevices,
-  revokeDevice,
-  getDevice,
-  createEnvelope,
-  type Device,
-} from '../services/api';
-import {
-  exportSymmetricKey,
-  importPublicKeyFromPEM,
-  encryptWithPublicKey,
-  arrayBufferToBase64,
-  base64ToArrayBuffer,
-} from '../utils/crypto';
-import { getMDKFromMemory, getDeviceId } from '../utils/storage';
+import { listDevices, revokeDevice } from '../services/api';
+import { getDeviceName, clearAllStorage } from '../utils/storage';
+
+interface Device {
+  id: string;
+  deviceName: string;
+  status: 'active' | 'inactive' | 'revoked';
+  createdAt: string;
+  updatedAt: string;
+}
 
 export default function DeviceManager() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
 
   useEffect(() => {
     loadDevices();
@@ -29,63 +23,25 @@ export default function DeviceManager() {
     try {
       const response = await listDevices();
       setDevices(response.devices);
+
+      // Verificar se o dispositivo atual ainda está ativo
+      const currentDeviceName = getDeviceName();
+      const currentDevice = response.devices.find(d => d.deviceName === currentDeviceName);
+      
+      if (currentDevice && currentDevice.status !== 'active') {
+        console.warn('[DeviceManager] Dispositivo atual não está ativo, fazendo logout');
+        alert('Seu dispositivo foi revogado. Você será desconectado.');
+        clearAllStorage();
+        window.location.href = '/';
+        return;
+      }
     } catch (error) {
       console.error('Erro ao carregar dispositivos:', error);
     }
   };
 
-  const handleAuthorize = async (device: Device) => {
-    setMessage('');
-    setLoading(true);
-    setSelectedDevice(device);
-
-    try {
-      const mdk = getMDKFromMemory();
-      if (!mdk) {
-        throw new Error('MDK não encontrada na memória.');
-      }
-
-      // Passo 1: Buscar informações do dispositivo
-      setMessage(`🔍 Buscando informações do dispositivo ${device.deviceId.substring(0, 8)}...`);
-      const deviceInfo = await getDevice(device.id);
-
-      // Passo 2: Importar chave pública do dispositivo
-      setMessage('🔑 Importando chave pública do dispositivo...');
-      const publicKey = await importPublicKeyFromPEM(deviceInfo.data.publicKey);
-
-      // Passo 3: Exportar MDK
-      setMessage('📤 Exportando MDK...');
-      const mdkBase64 = await exportSymmetricKey(mdk);
-      const mdkBuffer = base64ToArrayBuffer(mdkBase64);
-
-      // Passo 4: Criptografar MDK com chave pública do dispositivo
-      setMessage('🔒 Criptografando MDK para o dispositivo...');
-      const encryptedMdk = await encryptWithPublicKey(mdkBuffer, publicKey);
-      const envelopeCiphertext = arrayBufferToBase64(encryptedMdk);
-
-      // Passo 5: Criar envelope
-      setMessage('📮 Criando envelope no servidor...');
-      await createEnvelope({
-        deviceId: device.deviceId,
-        envelopeCiphertext,
-        encryptionMetadata: {
-          algorithm: 'RSA-OAEP',
-          hashFunction: 'SHA-256',
-        },
-      });
-
-      setMessage(`✅ Dispositivo ${device.deviceId.substring(0, 8)} autorizado com sucesso!`);
-      await loadDevices();
-    } catch (error) {
-      setMessage(`❌ Erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-    } finally {
-      setLoading(false);
-      setSelectedDevice(null);
-    }
-  };
-
   const handleRevoke = async (device: Device) => {
-    if (!confirm(`⚠️ Tem certeza que deseja revogar o dispositivo ${device.deviceId.substring(0, 8)}?\n\nEsta ação requer sua senha e não pode ser desfeita.`)) {
+    if (!confirm(`⚠️ Tem certeza que deseja revogar o dispositivo "${device.deviceName}"?\n\nEsta ação requer sua senha e não pode ser desfeita.`)) {
       return;
     }
 
@@ -97,30 +53,27 @@ export default function DeviceManager() {
 
     setMessage('');
     setLoading(true);
-    setSelectedDevice(device);
 
     try {
-      setMessage(`🚫 Revogando dispositivo ${device.deviceId.substring(0, 8)}...`);
-      await revokeDevice(device.deviceId, password, 'user_initiated');
+      setMessage(`🚫 Revogando dispositivo ${device.deviceName}...`);
+      await revokeDevice(device.deviceName, password, 'user_initiated');
 
-      setMessage(`✅ Dispositivo ${device.deviceId.substring(0, 8)} revogado com sucesso!`);
+      setMessage(`✅ Dispositivo "${device.deviceName}" revogado com sucesso!`);
       await loadDevices();
     } catch (error) {
       setMessage(`❌ Erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setLoading(false);
-      setSelectedDevice(null);
     }
   };
 
-  const currentDeviceId = getDeviceId();
+  const currentDeviceName = getDeviceName();
 
   const getStatusBadge = (status: string) => {
     const badges = {
       active: { text: '✅ Ativo', color: '#28a745' },
       inactive: { text: '⚠️ Inativo', color: '#ffc107' },
       revoked: { text: '🚫 Revogado', color: '#dc3545' },
-      pending: { text: '⏳ Pendente', color: '#17a2b8' },
     };
     return badges[status as keyof typeof badges] || badges.active;
   };
@@ -143,14 +96,12 @@ export default function DeviceManager() {
       <div style={styles.infoBox}>
         <h3 style={styles.infoTitle}>ℹ️ Sobre Dispositivos</h3>
         <p style={styles.infoText}>
-          Cada dispositivo possui seu próprio par de chaves RSA. Para autorizar um novo dispositivo,
-          ele precisa ter o <strong>envelope</strong> (MDK criptografada com sua chave pública).
+          Cada dispositivo é identificado por um nome único. Todos os dispositivos autorizados
+          têm acesso à mesma chave de criptografia gerada pelo servidor.
         </p>
         <p style={styles.infoText}>
-          Status <strong>Pendente</strong>: Dispositivo registrado mas sem envelope (não pode acessar arquivos).
-        </p>
-        <p style={styles.infoText}>
-          Para autorizar, clique em <strong>"Autorizar Dispositivo"</strong>.
+          Para revogar um dispositivo, clique em <strong>"Revogar"</strong>.
+          Esta ação bloqueia o acesso à API mas não remove arquivos já baixados.
         </p>
       </div>
 
@@ -164,9 +115,8 @@ export default function DeviceManager() {
         ) : (
           <div style={styles.devicesList}>
             {devices.map((device) => {
-              const isCurrentDevice = device.deviceId === currentDeviceId;
+              const isCurrentDevice = device.deviceName === currentDeviceName;
               const badge = getStatusBadge(device.status);
-              const isPending = device.status === 'inactive';
 
               return (
                 <div
@@ -180,52 +130,30 @@ export default function DeviceManager() {
                     <div style={styles.deviceHeader}>
                       <span style={styles.deviceName}>
                         {isCurrentDevice && '⭐ '}
-                        {device.deviceId.substring(0, 12)}...
+                        {device.deviceName}
                       </span>
                       <span style={{...styles.statusBadge, background: badge.color}}>
                         {badge.text}
                       </span>
                     </div>
                     <div style={styles.deviceDetails}>
-                      <div>🔑 Fingerprint: {device.keyFingerprint.substring(0, 16)}...</div>
                       <div>📅 Criado: {new Date(device.createdAt).toLocaleString('pt-BR')}</div>
-                      {device.isMasterDevice === 1 && (
-                        <div style={styles.masterBadge}>👑 Dispositivo Mestre</div>
-                      )}
+                      <div>🔄 Atualizado: {new Date(device.updatedAt).toLocaleString('pt-BR')}</div>
                     </div>
                   </div>
 
-                  {!isCurrentDevice && (
+                  {!isCurrentDevice && device.status === 'active' && (
                     <div style={styles.deviceActions}>
-                      {isPending && (
-                        <button
-                          onClick={() => handleAuthorize(device)}
-                          disabled={loading && selectedDevice?.id === device.id}
-                          style={{
-                            ...styles.authorizeButton,
-                            ...(loading && selectedDevice?.id === device.id ? styles.buttonDisabled : {})
-                          }}
-                        >
-                          {loading && selectedDevice?.id === device.id 
-                            ? '⏳ Autorizando...' 
-                            : '✅ Autorizar'}
-                        </button>
-                      )}
-
-                      {device.status === 'active' && (
-                        <button
-                          onClick={() => handleRevoke(device)}
-                          disabled={loading && selectedDevice?.id === device.id}
-                          style={{
-                            ...styles.revokeButton,
-                            ...(loading && selectedDevice?.id === device.id ? styles.buttonDisabled : {})
-                          }}
-                        >
-                          {loading && selectedDevice?.id === device.id 
-                            ? '⏳ Revogando...' 
-                            : '🚫 Revogar'}
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleRevoke(device)}
+                        disabled={loading}
+                        style={{
+                          ...styles.revokeButton,
+                          ...(loading ? styles.buttonDisabled : {})
+                        }}
+                      >
+                        {loading ? '⏳ Revogando...' : '🚫 Revogar'}
+                      </button>
                     </div>
                   )}
 
@@ -355,30 +283,9 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: '4px',
   },
-  masterBadge: {
-    display: 'inline-block',
-    marginTop: '8px',
-    padding: '4px 12px',
-    background: '#ffd700',
-    color: '#333',
-    borderRadius: '8px',
-    fontSize: '12px',
-    fontWeight: '600',
-  },
   deviceActions: {
     display: 'flex',
     gap: '8px',
-  },
-  authorizeButton: {
-    padding: '8px 16px',
-    background: '#28a745',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '600',
-    transition: 'opacity 0.3s',
   },
   revokeButton: {
     padding: '8px 16px',

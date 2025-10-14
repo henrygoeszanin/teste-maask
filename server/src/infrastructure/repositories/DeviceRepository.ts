@@ -11,16 +11,8 @@ export class DeviceRepository implements IDeviceRepository {
       .values({
         id: device.id,
         userId: device.userId,
-        deviceId: device.deviceId,
-        publicKey: device.publicKey,
-        publicKeyFormat: device.publicKeyFormat,
-        keyFingerprint: device.keyFingerprint,
+        deviceName: device.deviceName,
         status: device.status,
-        isMasterDevice: device.isMasterDevice,
-        revokedAt: device.revokedAt,
-        revokedBy: device.revokedBy,
-        revocationReason: device.revocationReason,
-        lastSeen: device.lastSeen,
         createdAt: device.createdAt,
         updatedAt: device.updatedAt,
       })
@@ -39,19 +31,17 @@ export class DeviceRepository implements IDeviceRepository {
     return device ? this.mapToEntity(device) : null;
   }
 
-  async findByDeviceId(deviceId: string): Promise<Device | null> {
+  async findByDeviceName(deviceName: string): Promise<Device | null> {
     const [device] = await db
       .select()
       .from(devices)
-      .where(eq(devices.deviceId, deviceId))
+      .where(eq(devices.deviceName, deviceName))
       .limit(1);
 
     return device ? this.mapToEntity(device) : null;
   }
 
   async findByUserId(userId: string, status?: DeviceStatus): Promise<Device[]> {
-    const query = db.select().from(devices).where(eq(devices.userId, userId));
-
     if (status) {
       const results = await db
         .select()
@@ -60,7 +50,10 @@ export class DeviceRepository implements IDeviceRepository {
       return results.map(this.mapToEntity);
     }
 
-    const results = await query;
+    const results = await db
+      .select()
+      .from(devices)
+      .where(eq(devices.userId, userId));
     return results.map(this.mapToEntity);
   }
 
@@ -68,15 +61,8 @@ export class DeviceRepository implements IDeviceRepository {
     const [updated] = await db
       .update(devices)
       .set({
-        publicKey: device.publicKey,
-        publicKeyFormat: device.publicKeyFormat,
-        keyFingerprint: device.keyFingerprint,
+        deviceName: device.deviceName,
         status: device.status,
-        isMasterDevice: device.isMasterDevice,
-        revokedAt: device.revokedAt,
-        revokedBy: device.revokedBy,
-        revocationReason: device.revocationReason,
-        lastSeen: device.lastSeen,
         updatedAt: device.updatedAt,
       })
       .where(eq(devices.id, device.id))
@@ -89,53 +75,14 @@ export class DeviceRepository implements IDeviceRepository {
     await db.delete(devices).where(eq(devices.id, id));
   }
 
-  async revoke(
-    deviceId: string,
-    metadata: { revokedBy: string; reason: string }
-  ): Promise<void> {
-    await db
-      .update(devices)
-      .set({
-        status: "revoked",
-        revokedAt: new Date(),
-        revokedBy: metadata.revokedBy,
-        revocationReason: metadata.reason,
-        updatedAt: new Date(),
-      })
-      .where(eq(devices.id, deviceId));
-  }
-
-  async countMasterDevices(userId: string): Promise<number> {
-    const results = await db
-      .select()
-      .from(devices)
-      .where(
-        and(
-          eq(devices.userId, userId),
-          eq(devices.isMasterDevice, 1),
-          eq(devices.status, "active")
-        )
-      );
-
-    return results.length;
-  }
-
   private mapToEntity(row: typeof devices.$inferSelect): Device {
     return new Device(
       row.id,
       row.userId,
-      row.deviceId,
-      row.publicKey,
-      row.publicKeyFormat,
-      row.keyFingerprint,
-      row.status as DeviceStatus,
-      row.isMasterDevice,
-      row.revokedAt,
-      row.revokedBy,
-      row.revocationReason,
-      row.lastSeen,
+      row.deviceName,
       row.createdAt,
-      row.updatedAt
+      row.updatedAt,
+      row.status as DeviceStatus
     );
   }
 }

@@ -14,6 +14,7 @@ export interface LoginResult {
     name: string;
     email: string;
   };
+  criptografyCode: string;
 }
 
 export class LoginUseCase {
@@ -32,6 +33,7 @@ export class LoginUseCase {
       throw new Error("Usuário ou senha inválidos");
     }
 
+    // Gerar tokens JWT
     const payload = { sub: user.id, email: user.email, name: user.name };
     const expiresIn = config.auth.accessTokenExpiresIn;
     const refreshExpiresIn = config.auth.refreshTokenExpiresIn;
@@ -53,6 +55,7 @@ export class LoginUseCase {
         name: user.name,
         email: user.email,
       },
+      criptografyCode: user.criptografyCode,
     };
   }
 

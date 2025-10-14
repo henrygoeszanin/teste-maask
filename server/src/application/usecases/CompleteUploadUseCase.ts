@@ -1,4 +1,4 @@
-import { File, EncryptionMetadata } from "@/domain/entities/Files";
+import { File } from "@/domain/entities/Files";
 import { IFileRepository } from "@/application/interfaces/IFileRepository";
 import { SupabaseStorageService } from "@/infrastructure/external/SupabaseStorageService";
 import { AppError } from "@/domain/errors/AppError";
@@ -9,9 +9,6 @@ export interface CompleteUploadInput {
   fileId: string;
   fileName: string;
   fileSize: number;
-  encryptedFek: string;
-  fekEncryptionMetadata: EncryptionMetadata;
-  fileEncryptionMetadata: EncryptionMetadata;
 }
 
 export interface CompleteUploadOutput {
@@ -39,7 +36,7 @@ export class CompleteUploadUseCase {
 
     if (!fileExists) {
       throw new AppError(
-        "Arquivo não encontrado no storage. O upload pode ter falhar ou expirado.",
+        "Arquivo não encontrado no storage. O upload pode ter falhado ou expirado.",
         404
       );
     }
@@ -56,10 +53,7 @@ export class CompleteUploadUseCase {
       input.userId,
       input.fileName,
       input.fileSize,
-      storagePath,
-      input.encryptedFek,
-      input.fekEncryptionMetadata,
-      input.fileEncryptionMetadata
+      storagePath
     );
 
     // Sobrescreve o fileId gerado pelo create com o fornecido

@@ -37,38 +37,6 @@ export const CompleteUploadSchema = z.object({
   fileId: z.string().min(1, "fileId é obrigatório"),
   fileName: z.string().min(1, "fileName é obrigatório"),
   fileSize: z.number().int().positive("fileSize deve ser maior que 0"),
-  encryptedFek: z
-    .string()
-    .min(1, "encryptedFek é obrigatório")
-    .describe("FEK criptografada pela MDK em base64"),
-  fekEncryptionMetadata: z.object({
-    algorithm: z
-      .string()
-      .default("AES-256-GCM")
-      .describe("Algoritmo usado para criptografar a FEK"),
-    iv: z
-      .string()
-      .min(1, "iv é obrigatório")
-      .describe("IV usado para criptografar a FEK em base64"),
-    authTag: z
-      .string()
-      .min(1, "authTag é obrigatório")
-      .describe("AuthTag da criptografia da FEK em base64"),
-  }),
-  fileEncryptionMetadata: z.object({
-    algorithm: z
-      .string()
-      .default("AES-256-GCM")
-      .describe("Algoritmo usado para criptografar o arquivo"),
-    iv: z
-      .string()
-      .min(1, "iv é obrigatório")
-      .describe("IV usado para criptografar o arquivo em base64"),
-    authTag: z
-      .string()
-      .min(1, "authTag é obrigatório")
-      .describe("AuthTag da criptografia do arquivo em base64"),
-  }),
 });
 
 export type CompleteUploadDTO = z.infer<typeof CompleteUploadSchema>;
@@ -94,17 +62,6 @@ export const DownloadFileResponseSchema = z.object({
     fileId: z.string(),
     fileName: z.string(),
     presignedUrl: z.string(),
-    encryptedFek: z.string(),
-    fekEncryptionMetadata: z.object({
-      algorithm: z.string(),
-      iv: z.string(),
-      authTag: z.string(),
-    }),
-    fileEncryptionMetadata: z.object({
-      algorithm: z.string(),
-      iv: z.string(),
-      authTag: z.string(),
-    }),
     expiresIn: z.number(),
   }),
 });

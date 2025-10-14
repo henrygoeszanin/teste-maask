@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { login, register } from '../services/api';
-import { saveTokens, saveUserEmail } from '../utils/storage';
+import { login, register, registerDevice } from '../services/api';
+import { saveTokens, saveUserEmail, saveDeviceName, saveCriptographyCode } from '../utils/storage';
 
 interface AuthProps {
   onAuthSuccess: () => void;
@@ -31,6 +31,27 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
         const response = await login({ email, password });
         saveTokens(response.accessToken, response.refreshToken);
         saveUserEmail(email);
+
+        // Salvar criptografyCode do usuário (vem no nível raiz da resposta)
+        console.log('[Auth] Salvando criptografyCode do usuário...');
+        saveCriptographyCode(response.criptografyCode);
+        console.log('[Auth] criptografyCode salva com sucesso');
+
+        // Gerar nome único para o dispositivo
+        const deviceName = `Web-${navigator.platform}-${Date.now()}`;
+        saveDeviceName(deviceName);
+        console.log('[Auth] Device name gerado:', deviceName);
+
+        // Registrar dispositivo no backend
+        console.log('[Auth] Registrando dispositivo no backend...');
+        try {
+          await registerDevice({ deviceName });
+          console.log('[Auth] Dispositivo registrado com sucesso');
+        } catch (deviceError) {
+          console.warn('[Auth] Aviso: Falha ao registrar dispositivo:', deviceError);
+          // Não bloqueia o login se o registro do dispositivo falhar
+        }
+
         setMessage('✅ Login realizado com sucesso!');
         setTimeout(() => onAuthSuccess(), 500);
       }
@@ -44,7 +65,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h1 style={styles.title}>🔐 Maask E2EE</h1>
+        <h1 style={styles.title}>🔐 Maask</h1>
         <p style={styles.subtitle}>
           {mode === 'login' ? 'Entre na sua conta' : 'Crie sua conta'}
         </p>

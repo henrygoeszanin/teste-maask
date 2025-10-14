@@ -28,6 +28,7 @@ export async function userRoutes(app: FastifyInstance) {
     new UpdateUserUseCase(userRepository)
   );
 
+  // registra o novo SenhaDoUsuario123
   app.withTypeProvider<ZodTypeProvider>().post(
     "/",
     {

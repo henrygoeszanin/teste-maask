@@ -4,6 +4,7 @@ import { UserAlreadyExistsError } from "@/domain/errors/UserAlreadyExistsError";
 import { RegisterUseCase } from "@/application/usecases/RegisterUseCase";
 import { UpdateUserUseCase } from "@/application/usecases/UpdateUserUseCase";
 import { NotFoundError } from "@/domain/errors/NotFoundError";
+import crypto from "crypto";
 
 export class UserController {
   constructor(
@@ -14,8 +15,12 @@ export class UserController {
   async create(request: FastifyRequest, reply: FastifyReply) {
     const userData = request.body as RegisterDTO;
     try {
-      const response = await this.registerUseCase.execute(userData);
-      // Garante que datas sejam string ISO
+      const newCryptografyCode = crypto.randomBytes(64).toString("hex"); // Gera um código de criptografia aleatório
+
+      const response = await this.registerUseCase.execute(
+        userData,
+        newCryptografyCode
+      );
       const data = {
         ...response,
         createdAt:
@@ -27,9 +32,11 @@ export class UserController {
             ? response.updatedAt.toISOString()
             : response.updatedAt,
       };
-      return reply
-        .status(201)
-        .send({ message: "Usuário criado com sucesso", data });
+      return reply.status(201).send({
+        message: "Usuário criado com sucesso",
+        criptografyCode: newCryptografyCode, // Inclui o código de criptografia no nível raiz
+        data,
+      });
     } catch (error) {
       if (error instanceof UserAlreadyExistsError) {
         return reply.status(409).send({ error: error.message });

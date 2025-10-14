@@ -5,13 +5,14 @@ import { authenticate } from "@/presentation/middlewares/authenticate";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import {
+  DeviceListResponseSchema,
+  DeviceErrorResponseSchema,
   RegisterDeviceSchema,
   DeviceResponseSchema,
-  DeviceListResponseSchema,
-  DeviceRevokeResponseSchema,
-  DeviceErrorResponseSchema,
-  RevokeDeviceSchema,
+  AuthorizeDeviceResponseSchema,
+  AuthorizeDeviceSchema,
   RevokeDeviceResponseSchema,
+  RevokeDeviceSchema,
 } from "@/application/dtos/device.dto";
 
 // Helper para adicionar exemplos aos schemas Zod
@@ -33,21 +34,18 @@ export async function deviceRoutes(app: FastifyInstance) {
           "Registra um novo dispositivo para o usuário autenticado (requer Bearer token)",
         body: withExamples(RegisterDeviceSchema, [
           {
-            deviceId: "550e8400-e29b-41d4-a716-446655440000",
-            publicKey:
-              "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...\n-----END PUBLIC KEY-----",
-            publicKeyFormat: "PEM",
-            keyFingerprint:
-              "a7b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t1u2v3w4x5y6z7a8b9c0d1e2f3",
+            deviceName: "Web-Win32-1744392847291",
           },
         ]),
         response: {
           201: withExamples(DeviceResponseSchema, [
             {
-              id: "123e4567-e89b-12d3-a456-426614174000",
-              deviceId: "550e8400-e29b-41d4-a716-446655440000",
+              id: "device-ulid-123",
+              deviceName: "Meu notebook pessoal",
               status: "active",
               createdAt: "2025-10-14T12:00:00.000Z",
+              updatedAt: "2025-10-14T12:00:00.000Z",
+              userId: "user-ulid-123",
             },
           ]),
           401: withExamples(DeviceErrorResponseSchema, [
@@ -74,12 +72,12 @@ export async function deviceRoutes(app: FastifyInstance) {
             {
               devices: [
                 {
-                  id: "123e4567-e89b-12d3-a456-426614174000",
-                  deviceId: "550e8400-e29b-41d4-a716-446655440000",
-                  keyFingerprint:
-                    "a7b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t1u2v3w4x5y6z7a8b9c0d1e2f3",
+                  id: "device-ulid-123",
+                  deviceName: "Meu notebook pessoal",
                   status: "active",
                   createdAt: "2025-10-14T12:00:00.000Z",
+                  updatedAt: "2025-10-14T12:00:00.000Z",
+                  userId: "user-ulid-123",
                 },
               ],
             },
@@ -110,12 +108,11 @@ export async function deviceRoutes(app: FastifyInstance) {
           200: z.object({
             data: z.object({
               id: z.string(),
-              deviceId: z.string(),
-              publicKey: z.string(),
-              publicKeyFormat: z.string(),
-              keyFingerprint: z.string(),
+              deviceName: z.string(),
               status: z.string(),
               createdAt: z.string(),
+              updatedAt: z.string(),
+              userId: z.string(),
             }),
           }),
           404: withExamples(DeviceErrorResponseSchema, [
@@ -146,13 +143,13 @@ export async function deviceRoutes(app: FastifyInstance) {
           "Proteções: senha obrigatória, dispositivo não pode revogar a si mesmo, " +
           "apenas master devices podem revogar outros master devices",
         headers: z.object({
-          "x-device-id": z.string().uuid("Device ID deve ser um UUID válido"),
+          "x-device-name": z.string().min(1, "Device name é obrigatório"),
         }),
         body: withExamples(RevokeDeviceSchema, [
           {
-            deviceId: "550e8400-e29b-41d4-a716-446655440000",
+            deviceName: "Web-Win32-1744392847291",
             password: "SenhaDoUsuario123!",
-            reason: "stolen",
+            reason: "user_initiated",
           },
         ]),
         response: {
@@ -160,13 +157,13 @@ export async function deviceRoutes(app: FastifyInstance) {
             {
               message: "Device revoked successfully",
               data: {
-                deviceId: "550e8400-e29b-41d4-a716-446655440000",
+                deviceName: "Web-Win32-1744392847291",
                 revokedAt: "2025-10-14T12:05:00.000Z",
               },
             },
           ]),
           400: withExamples(DeviceErrorResponseSchema, [
-            { error: "Missing X-Device-Id header" },
+            { error: "Missing X-Device-Name header" },
             { error: "Cannot revoke your current device" },
           ]),
           401: withExamples(DeviceErrorResponseSchema, [

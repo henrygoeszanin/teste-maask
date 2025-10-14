@@ -31,10 +31,12 @@ const UserDataSchema = z.object({
   email: z.email(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  criptografyCode: z.string(),
 });
 
 export const UserResponseSchema = z.object({
   message: z.string(),
+  criptografyCode: z.string(),
   data: UserDataSchema,
 });
 

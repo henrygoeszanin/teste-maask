@@ -134,10 +134,15 @@ export async function fileRoutes(app: FastifyInstance) {
                 presignedUrl:
                   "https://txuiaqcmkhttexzhijmp.supabase.co/storage/v1/object/sign/user-data/...",
                 encryptedFek: "encrypted-fek-base64-content",
-                encryptionMetadata: {
+                fekEncryptionMetadata: {
                   algorithm: "AES-256-GCM",
-                  iv: "iv-base64",
-                  authTag: "auth-tag-base64",
+                  iv: "fek-iv-base64",
+                  authTag: "fek-auth-tag-base64",
+                },
+                fileEncryptionMetadata: {
+                  algorithm: "AES-256-GCM",
+                  iv: "file-iv-base64",
+                  authTag: "file-auth-tag-base64",
                 },
                 expiresIn: 3600,
               },
@@ -147,6 +152,12 @@ export async function fileRoutes(app: FastifyInstance) {
             { error: "Token not provided" },
           ]),
           404: withExamples(ErrorResponseSchema, [{ error: "File not found" }]),
+          410: withExamples(ErrorResponseSchema, [
+            {
+              error:
+                "Este arquivo foi carregado com uma versão antiga do sistema e não pode ser baixado. Por favor, faça o upload novamente.",
+            },
+          ]),
         },
         security: [{ bearerAuth: [] }],
       },

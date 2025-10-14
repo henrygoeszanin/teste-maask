@@ -2,22 +2,10 @@ import { z } from "zod";
 
 // Schema para registrar um novo dispositivo
 export const RegisterDeviceSchema = z.object({
-  deviceId: z.uuid("deviceId deve ser um UUID válido"),
-  publicKey: z
+  deviceName: z
     .string()
-    .min(100, "publicKey deve ter pelo menos 100 caracteres")
-    .regex(
-      /^-----BEGIN PUBLIC KEY-----/,
-      "publicKey deve estar em formato PEM"
-    ),
-  publicKeyFormat: z
-    .enum(["PEM", "SPKI"])
-    .default("PEM")
-    .describe("Formato da chave pública"),
-  keyFingerprint: z
-    .string()
-    .length(64, "keyFingerprint deve ser um hash SHA-256 (64 caracteres hex)")
-    .regex(/^[a-f0-9]{64}$/i, "keyFingerprint deve ser hexadecimal"),
+    .min(1, "deviceName é obrigatório")
+    .max(100, "deviceName deve ter no máximo 100 caracteres"),
 });
 
 export type RegisterDeviceDTO = z.infer<typeof RegisterDeviceSchema>;
@@ -25,18 +13,18 @@ export type RegisterDeviceDTO = z.infer<typeof RegisterDeviceSchema>;
 // Schema de resposta para dispositivo registrado
 export const DeviceResponseSchema = z.object({
   id: z.string(),
-  deviceId: z.uuid(),
-  status: z.enum(["active", "inactive"]),
+  deviceName: z.string(),
+  status: z.enum(["active", "inactive", "revoked"]),
   createdAt: z.string().datetime(),
 });
 
 // Schema de resposta para lista de dispositivos
 export const DeviceListItemSchema = z.object({
-  id: z.string(), // ULID, não UUID
-  deviceId: z.string().uuid(),
-  keyFingerprint: z.string(),
-  status: z.enum(["active", "inactive"]),
+  id: z.string(), // ULID
+  deviceName: z.string(),
+  status: z.enum(["active", "inactive", "revoked"]),
   createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
 });
 
 export const DeviceListResponseSchema = z.object({
@@ -46,8 +34,8 @@ export const DeviceListResponseSchema = z.object({
 // Schema de resposta para revogação de dispositivo
 export const DeviceRevokeResponseSchema = z.object({
   message: z.string(),
-  deviceId: z.string().uuid(),
-  status: z.enum(["active", "inactive"]),
+  deviceName: z.string(),
+  status: z.enum(["active", "inactive", "revoked"]),
 });
 
 // Schema de erro
@@ -60,7 +48,10 @@ export const registerDeviceSchema = RegisterDeviceSchema;
 
 // Schema para listar dispositivos (query params)
 export const listDevicesSchema = z.object({
-  status: z.enum(["active", "inactive", "all"]).optional().default("all"),
+  status: z
+    .enum(["active", "inactive", "revoked", "all"])
+    .optional()
+    .default("all"),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
 });
@@ -69,14 +60,14 @@ export type ListDevicesDTO = z.infer<typeof listDevicesSchema>;
 
 // Schema para revogar/atualizar dispositivo
 export const updateDeviceStatusSchema = z.object({
-  status: z.enum(["active", "inactive"]),
+  status: z.enum(["active", "inactive", "revoked"]),
 });
 
 export type UpdateDeviceStatusDTO = z.infer<typeof updateDeviceStatusSchema>;
 
 // Schema para revogar dispositivo (requer senha)
 export const RevokeDeviceSchema = z.object({
-  deviceId: z.string().uuid("deviceId deve ser um UUID válido"),
+  deviceName: z.string().min(1, "deviceName é obrigatório"),
   password: z.string().min(1, "Senha é obrigatória"),
   reason: z
     .enum(["lost", "stolen", "suspicious", "employee_exit", "user_initiated"])
@@ -90,7 +81,23 @@ export type RevokeDeviceDTO = z.infer<typeof RevokeDeviceSchema>;
 export const RevokeDeviceResponseSchema = z.object({
   message: z.string(),
   data: z.object({
-    deviceId: z.string().uuid(),
+    deviceName: z.string(),
     revokedAt: z.string().datetime(),
+  }),
+});
+
+// Schema para autorizar dispositivo
+export const AuthorizeDeviceSchema = z.object({
+  targetDeviceName: z.string().min(1, "targetDeviceName é obrigatório"),
+});
+
+export type AuthorizeDeviceDTO = z.infer<typeof AuthorizeDeviceSchema>;
+
+// Schema de resposta para autorização de dispositivo
+export const AuthorizeDeviceResponseSchema = z.object({
+  message: z.string(),
+  data: z.object({
+    deviceName: z.string(),
+    authorizedAt: z.string().datetime(),
   }),
 });

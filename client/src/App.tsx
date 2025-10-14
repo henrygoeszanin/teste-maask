@@ -1,43 +1,31 @@
 import { useState, useEffect } from 'react';
 import Auth from './components/Auth';
-import DeviceSetup from './components/DeviceSetup';
 import FileManager from './components/FileManager';
 import DeviceManager from './components/DeviceManager';
 import {
   isAuthenticated,
-  hasDeviceSetup,
-  hasMDK,
+  hasCriptographyCode,
   clearAllStorage,
   getUserEmail,
 } from './utils/storage';
 
-type Screen = 'auth' | 'device-setup' | 'dashboard';
-type Tab = 'files' | 'devices';
+type Screen = 'auth' | 'dashboard';
+type DashboardTab = 'files' | 'devices';
 
 function App() {
   const [screen, setScreen] = useState<Screen>('auth');
-  const [tab, setTab] = useState<Tab>('files');
+  const [activeTab, setActiveTab] = useState<DashboardTab>('files');
 
   useEffect(() => {
-    // Determinar tela inicial
-    if (!isAuthenticated()) {
-      setScreen('auth');
-    } else if (!hasDeviceSetup() || !hasMDK()) {
-      setScreen('device-setup');
-    } else {
+    // Determinar tela inicial: Auth ou Dashboard
+    if (isAuthenticated() && hasCriptographyCode()) {
       setScreen('dashboard');
+    } else {
+      setScreen('auth');
     }
   }, []);
 
   const handleAuthSuccess = () => {
-    if (hasDeviceSetup() && hasMDK()) {
-      setScreen('dashboard');
-    } else {
-      setScreen('device-setup');
-    }
-  };
-
-  const handleSetupComplete = () => {
     setScreen('dashboard');
   };
 
@@ -45,7 +33,6 @@ function App() {
     if (confirm('Tem certeza que deseja sair?')) {
       clearAllStorage();
       setScreen('auth');
-      setTab('files');
     }
   };
 
@@ -53,16 +40,12 @@ function App() {
     return <Auth onAuthSuccess={handleAuthSuccess} />;
   }
 
-  if (screen === 'device-setup') {
-    return <DeviceSetup onSetupComplete={handleSetupComplete} />;
-  }
-
   return (
     <div style={styles.container}>
       {/* Header */}
       <header style={styles.header}>
         <div style={styles.headerContent}>
-          <h1 style={styles.logo}>🔐 Maask E2EE</h1>
+          <h1 style={styles.logo}>🔐 Maask</h1>
           <div style={styles.userInfo}>
             <span style={styles.userEmail}>👤 {getUserEmail()}</span>
             <button onClick={handleLogout} style={styles.logoutButton}>
@@ -72,41 +55,42 @@ function App() {
         </div>
       </header>
 
-      {/* Navigation */}
+      {/* Navigation Tabs */}
       <nav style={styles.nav}>
-        <button
-          onClick={() => setTab('files')}
-          style={{
-            ...styles.navButton,
-            ...(tab === 'files' ? styles.navButtonActive : {}),
-          }}
-        >
-          📁 Arquivos
-        </button>
-        <button
-          onClick={() => setTab('devices')}
-          style={{
-            ...styles.navButton,
-            ...(tab === 'devices' ? styles.navButtonActive : {}),
-          }}
-        >
-          🖥️ Dispositivos
-        </button>
+        <div style={styles.navContent}>
+          <button
+            onClick={() => setActiveTab('files')}
+            style={{
+              ...styles.navTab,
+              ...(activeTab === 'files' ? styles.navTabActive : {}),
+            }}
+          >
+            📁 Arquivos
+          </button>
+          <button
+            onClick={() => setActiveTab('devices')}
+            style={{
+              ...styles.navTab,
+              ...(activeTab === 'devices' ? styles.navTabActive : {}),
+            }}
+          >
+            🖥️ Dispositivos
+          </button>
+        </div>
       </nav>
 
       {/* Content */}
       <main style={styles.main}>
         <div style={styles.content}>
-          {tab === 'files' && <FileManager />}
-          {tab === 'devices' && <DeviceManager />}
+          {activeTab === 'files' ? <FileManager /> : <DeviceManager />}
         </div>
       </main>
 
       {/* Footer */}
       <footer style={styles.footer}>
         <p style={styles.footerText}>
-          🔒 Todos os arquivos são criptografados ponta a ponta (E2EE) • 
-          Chaves privadas nunca saem do seu dispositivo
+          🔒 Todos os arquivos são criptografados com AES-256-GCM •
+          Chave gerada pelo servidor e acessível em dispositivos autorizados
         </p>
       </footer>
     </div>
@@ -162,25 +146,30 @@ const styles: Record<string, React.CSSProperties> = {
   nav: {
     background: 'white',
     borderBottom: '1px solid #e0e0e0',
-    display: 'flex',
-    justifyContent: 'center',
-    gap: '8px',
-    padding: '16px 24px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
   },
-  navButton: {
-    padding: '12px 24px',
+  navContent: {
+    maxWidth: '1200px',
+    margin: '0 auto',
+    padding: '0 24px',
+    display: 'flex',
+    gap: '0',
+  },
+  navTab: {
+    padding: '16px 24px',
     background: 'transparent',
-    color: '#666',
     border: 'none',
-    borderRadius: '8px',
+    borderBottom: '3px solid transparent',
     cursor: 'pointer',
     fontSize: '16px',
     fontWeight: '600',
+    color: '#666',
     transition: 'all 0.3s',
   },
-  navButtonActive: {
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: 'white',
+  navTabActive: {
+    color: '#667eea',
+    borderBottomColor: '#667eea',
+    background: '#f8f9ff',
   },
   main: {
     flex: 1,

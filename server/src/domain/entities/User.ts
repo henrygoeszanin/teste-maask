@@ -9,6 +9,7 @@ export class User {
     public email: string,
     public createdAt: Date,
     public password: string,
+    public criptografyCode: string,
     public pepperVersion: number,
     public memoryCost: number,
     public timeCost: number,
@@ -16,13 +17,19 @@ export class User {
     public updatedAt: Date
   ) {}
 
-  static create(name: string, email: string, password: string): User {
+  static create(
+    name: string,
+    email: string,
+    password: string,
+    criptografyCode: string
+  ): User {
     return new User(
       ulid(), // id
       name,
       email,
       new Date(), // createdAt
       password, // password
+      criptografyCode,
       config.security.pepperVersion, // pepperVersion (default value)
       config.security.memoryCost, // memoryCost (default value)
       config.security.timeCost, // timeCost (default value)

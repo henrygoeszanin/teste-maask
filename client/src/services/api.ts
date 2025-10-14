@@ -4,10 +4,10 @@
 
 import {
   getAccessToken,
-  getDeviceId,
   getRefreshToken,
   saveTokens,
-  clearAuth,
+  clearTokens,
+  getDeviceName,
 } from "../utils/storage";
 
 const API_BASE_URL = "http://localhost:3000/api";
@@ -24,7 +24,7 @@ async function fetchAPI<T>(
   isRetry = false
 ): Promise<T> {
   const token = getAccessToken();
-  const deviceId = getDeviceId();
+  const deviceName = getDeviceName();
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -35,9 +35,9 @@ async function fetchAPI<T>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  // Envia X-Device-Id para todos os endpoints, exceto /devices (para evitar conflito no registro)
-  if (deviceId && !endpoint.includes("/devices")) {
-    headers["X-Device-Id"] = deviceId;
+  // Envia X-Device-Name para endpoints que precisam identificar o dispositivo
+  if (deviceName && endpoint.includes("/devices/revoke")) {
+    headers["X-Device-Name"] = deviceName;
   }
 
   console.log("[API] Request:", endpoint, options);
@@ -58,7 +58,7 @@ async function fetchAPI<T>(
       return fetchAPI<T>(endpoint, options, true);
     } catch (err) {
       console.error("[API] Falha ao renovar token:", err);
-      clearAuth();
+      clearTokens();
       window.location.href = "/";
       throw new Error("Sessão expirada. Faça login novamente.");
     }
@@ -88,7 +88,8 @@ async function refreshAccessToken(): Promise<string> {
   refreshPromise = (async () => {
     try {
       const refreshToken = getRefreshToken();
-      if (!refreshToken) {
+      if (!refreshToken || refreshToken.length < 10) {
+        console.error("[API] RefreshToken inválido ou ausente");
         throw new Error("No refresh token available");
       }
 
@@ -108,8 +109,12 @@ async function refreshAccessToken(): Promise<string> {
       }
 
       const data = await response.json();
-      saveTokens(data.accessToken, data.refreshToken);
-      console.log("[API] Tokens salvos após refresh");
+      // Salva apenas o novo accessToken, mantém o refreshToken existente
+      const currentRefreshToken = getRefreshToken();
+      if (currentRefreshToken) {
+        saveTokens(data.accessToken, currentRefreshToken);
+      }
+      console.log("[API] Access token renovado");
       return data.accessToken;
     } finally {
       isRefreshing = false;
@@ -130,6 +135,7 @@ export interface RegisterRequest {
 
 export interface RegisterResponse {
   message: string;
+  criptografyCode: string; // Código de criptografia gerado no registro
   data: {
     id: string;
     name: string;
@@ -155,6 +161,14 @@ export interface LoginRequest {
 export interface LoginResponse {
   accessToken: string;
   refreshToken: string;
+  expiresIn: number;
+  refreshExpiresIn: number;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  criptografyCode: string; // Código de criptografia do usuário (retornado no nível raiz)
 }
 
 export async function login(data: LoginRequest): Promise<LoginResponse> {
@@ -184,20 +198,13 @@ export async function refreshToken(
 // ==================== DEVICES ====================
 
 export interface RegisterDeviceRequest {
-  deviceId: string;
-  publicKey: string;
-  publicKeyFormat: string;
-  keyFingerprint: string;
+  deviceName: string; // Nome único do dispositivo
 }
 
 export interface Device {
   id: string;
-  deviceId: string;
-  publicKey: string;
-  publicKeyFormat: string;
-  keyFingerprint: string;
+  deviceName: string;
   status: "active" | "inactive" | "revoked";
-  isMasterDevice: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -236,74 +243,20 @@ export async function getDevice(deviceId: string): Promise<GetDeviceResponse> {
 export interface RevokeDeviceResponse {
   message: string;
   data: {
-    deviceId: string;
+    deviceName: string;
     revokedAt: string;
   };
 }
 
 export async function revokeDevice(
-  deviceId: string,
+  deviceName: string,
   password: string,
   reason: string
 ): Promise<RevokeDeviceResponse> {
-  return fetchAPI<RevokeDeviceResponse>(`/devices/revoke`, {
+  return fetchAPI<RevokeDeviceResponse>("/devices/revoke", {
     method: "POST",
-    body: JSON.stringify({ deviceId, password, reason }),
+    body: JSON.stringify({ deviceName, password, reason }),
   });
-}
-
-// ==================== ENVELOPES ====================
-
-export interface CreateEnvelopeRequest {
-  deviceId: string;
-  envelopeCiphertext: string;
-  encryptionMetadata: {
-    algorithm: string;
-    hashFunction: string;
-  };
-}
-
-export interface Envelope {
-  id: string;
-  userId: string;
-  deviceId: string;
-  envelopeCiphertext: string;
-  encryptionMetadata: {
-    algorithm: string;
-    hashFunction: string;
-  };
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateEnvelopeResponse {
-  message: string;
-  data: Envelope;
-}
-
-export async function createEnvelope(
-  data: CreateEnvelopeRequest
-): Promise<CreateEnvelopeResponse> {
-  return fetchAPI<CreateEnvelopeResponse>("/envelopes", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-export interface GetEnvelopeResponse {
-  data: Envelope;
-}
-
-export async function getMyEnvelope(): Promise<GetEnvelopeResponse> {
-  console.log("[API] getMyEnvelope: chamada iniciada");
-  try {
-    const result = await fetchAPI<GetEnvelopeResponse>("/envelopes/me");
-    console.log("[API] getMyEnvelope: sucesso", result);
-    return result;
-  } catch (err) {
-    console.error("[API] getMyEnvelope: erro", err);
-    throw err;
-  }
 }
 
 // ==================== FILES ====================
@@ -337,17 +290,6 @@ export interface CompleteUploadRequest {
   fileId: string;
   fileName: string;
   fileSize: number;
-  encryptedFek: string;
-  fekEncryptionMetadata: {
-    algorithm: string;
-    iv: string;
-    authTag: string;
-  };
-  fileEncryptionMetadata: {
-    algorithm: string;
-    iv: string;
-    authTag: string;
-  };
 }
 
 export interface CompleteUploadResponse {
@@ -397,18 +339,8 @@ export interface DownloadFileResponse {
     fileId: string;
     fileName: string;
     presignedUrl: string;
-    encryptedFek: string;
-    fekEncryptionMetadata: {
-      algorithm: string;
-      iv: string;
-      authTag: string;
-    };
-    fileEncryptionMetadata: {
-      algorithm: string;
-      iv: string;
-      authTag: string;
-    };
     expiresIn: number;
+    // Removidos: encryptedFek, fekEncryptionMetadata, fileEncryptionMetadata
   };
 }
 

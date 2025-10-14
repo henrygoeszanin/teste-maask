@@ -30,6 +30,7 @@ export class UserRepository implements IUserRepository {
         parallelism: users.parallelism,
         createdAt: users.createdAt,
         updatedAt: users.updatedAt,
+        criptografyCode: users.criptografyCode,
       })
       .from(users);
     return result;
@@ -42,6 +43,7 @@ export class UserRepository implements IUserRepository {
       email: users.email,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
+      criptografyCode: users.criptografyCode,
     });
     return result[0];
   }
@@ -64,6 +66,7 @@ export class UserRepository implements IUserRepository {
         parallelism: users.parallelism,
         createdAt: users.createdAt,
         updatedAt: users.updatedAt,
+        criptografyCode: users.criptografyCode,
       });
     return result[0];
   }

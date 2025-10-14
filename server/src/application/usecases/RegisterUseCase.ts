@@ -9,7 +9,10 @@ import { UserAlreadyExistsError } from "@/domain/errors/UserAlreadyExistsError";
 export class RegisterUseCase {
   constructor(private readonly userRepo: IUserRepository) {}
 
-  async execute(data: RegisterDTO): Promise<PublicUser> {
+  async execute(
+    data: RegisterDTO,
+    newCryptografyCode: string
+  ): Promise<PublicUser> {
     // Verifica se já existe usuário com o e-mail
     const existing = await this.userRepo.findByEmail(data.email);
     if (existing) {
@@ -33,7 +36,7 @@ export class RegisterUseCase {
       parallelism: params.parallelism,
     });
 
-    const user = User.create(data.name, data.email, hash); // Cria a entidade User com a senha já hasheada
+    const user = User.create(data.name, data.email, hash, newCryptografyCode); // Cria a entidade User com a senha já hasheada
 
     const newUser = await this.userRepo.create(user); // Salva o usuário no repositório
 

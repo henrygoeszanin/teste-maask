@@ -47,15 +47,8 @@ export class FileController {
    */
   static async completeUpload(request: FastifyRequest, reply: FastifyReply) {
     const userId = request.user?.id!;
-    const {
-      uploadId,
-      fileId,
-      fileName,
-      fileSize,
-      encryptedFek,
-      fekEncryptionMetadata,
-      fileEncryptionMetadata,
-    } = request.body as CompleteUploadDTO;
+    const { uploadId, fileId, fileName, fileSize } =
+      request.body as CompleteUploadDTO;
 
     const fileRepository = new FileRepository();
     const storageService = new SupabaseStorageService();
@@ -70,9 +63,6 @@ export class FileController {
       fileId,
       fileName,
       fileSize,
-      encryptedFek,
-      fekEncryptionMetadata,
-      fileEncryptionMetadata,
     });
 
     return reply.status(200).send({

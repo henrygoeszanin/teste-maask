@@ -25,6 +25,7 @@ export const LoginResponseSchema = z.object({
     name: z.string(),
     email: z.string().email(),
   }),
+  criptografyCode: z.string().describe("Código de criptografia do usuário"),
 });
 
 export const AuthErrorResponseSchema = z.object({

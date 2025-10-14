@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1760405704811,
-      "tag": "0000_talented_kang",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1760464104698,
-      "tag": "0001_zippy_ezekiel",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1760467703649,
-      "tag": "0002_wonderful_stepford_cuckoos",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1760477424834,
-      "tag": "0003_romantic_lilith",
+      "when": 1760483170890,
+      "tag": "0000_lazy_blob",
       "breakpoints": true
     }
   ]

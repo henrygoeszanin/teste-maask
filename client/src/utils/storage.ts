@@ -1,20 +1,16 @@
 /**
- * Armazenamento local para dados sensíveis
- * Usa localStorage para persistência
+ * Armazenamento local simplificado para dados sensíveis
+ * criptografyCode é mantida em localStorage (criptografada no servidor)
+ * Tokens e dados do usuário são persistidos em localStorage
  */
-
-import { exportPrivateKeyToPEM, importPrivateKeyFromPEM } from "./crypto";
 
 const STORAGE_KEYS = {
   ACCESS_TOKEN: "maask_access_token",
   REFRESH_TOKEN: "maask_refresh_token",
-  DEVICE_ID: "maask_device_id",
-  PRIVATE_KEY: "maask_private_key",
   USER_EMAIL: "maask_user_email",
+  CRIPTOGRAPHY_CODE: "maask_criptography_code",
+  DEVICE_NAME: "maask_device_name",
 } as const;
-
-// MDK é armazenada apenas em memória (nunca em localStorage)
-let mdkInMemory: CryptoKey | null = null;
 
 // ==================== TOKEN ====================
 
@@ -36,43 +32,6 @@ export function clearTokens() {
   localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
 }
 
-// ==================== DEVICE ID ====================
-
-export function saveDeviceId(deviceId: string) {
-  localStorage.setItem(STORAGE_KEYS.DEVICE_ID, deviceId);
-}
-
-export function getDeviceId(): string | null {
-  return localStorage.getItem(STORAGE_KEYS.DEVICE_ID);
-}
-
-export function clearDeviceId() {
-  localStorage.removeItem(STORAGE_KEYS.DEVICE_ID);
-}
-
-// ==================== PRIVATE KEY ====================
-
-export async function savePrivateKey(privateKey: CryptoKey) {
-  const pem = await exportPrivateKeyToPEM(privateKey);
-  localStorage.setItem(STORAGE_KEYS.PRIVATE_KEY, pem);
-}
-
-export async function getPrivateKey(): Promise<CryptoKey | null> {
-  const pem = localStorage.getItem(STORAGE_KEYS.PRIVATE_KEY);
-  if (!pem) return null;
-
-  try {
-    return await importPrivateKeyFromPEM(pem);
-  } catch (error) {
-    console.error("Erro ao importar chave privada:", error);
-    return null;
-  }
-}
-
-export function clearPrivateKey() {
-  localStorage.removeItem(STORAGE_KEYS.PRIVATE_KEY);
-}
-
 // ==================== USER EMAIL ====================
 
 export function saveUserEmail(email: string) {
@@ -87,48 +46,58 @@ export function clearUserEmail() {
   localStorage.removeItem(STORAGE_KEYS.USER_EMAIL);
 }
 
-// ==================== MDK (APENAS MEMÓRIA) ====================
+// ==================== CRIPTOGRAPHY CODE ====================
+// Chave de criptografia gerada pelo servidor para o usuário
+// Usada para criptografar/descriptografar todos os arquivos
 
-export function saveMDKInMemory(mdk: CryptoKey) {
-  mdkInMemory = mdk;
+export function saveCriptographyCode(criptographyCode: string) {
+  localStorage.setItem(STORAGE_KEYS.CRIPTOGRAPHY_CODE, criptographyCode);
+  console.log("[Storage] criptografyCode salva");
 }
 
-export function getMDKFromMemory(): CryptoKey | null {
-  return mdkInMemory;
+export function getCriptographyCode(): string | null {
+  return localStorage.getItem(STORAGE_KEYS.CRIPTOGRAPHY_CODE);
 }
 
-export function clearMDKFromMemory() {
-  mdkInMemory = null;
+export function clearCriptographyCode() {
+  localStorage.removeItem(STORAGE_KEYS.CRIPTOGRAPHY_CODE);
+  console.log("[Storage] criptografyCode removida");
+}
+
+// ==================== DEVICE NAME ====================
+// Nome único do dispositivo atual
+
+export function saveDeviceName(deviceName: string) {
+  localStorage.setItem(STORAGE_KEYS.DEVICE_NAME, deviceName);
+  console.log("[Storage] deviceName salvo:", deviceName);
+}
+
+export function getDeviceName(): string | null {
+  return localStorage.getItem(STORAGE_KEYS.DEVICE_NAME);
+}
+
+export function clearDeviceName() {
+  localStorage.removeItem(STORAGE_KEYS.DEVICE_NAME);
+  console.log("[Storage] deviceName removido");
+}
+
+// ==================== CRIPTOGRAPHY CODE STATUS ====================
+
+export function hasCriptographyCode(): boolean {
+  return getCriptographyCode() !== null;
 }
 
 // ==================== CLEAR ALL ====================
 
 export function clearAllStorage() {
   clearTokens();
-  clearDeviceId();
-  clearPrivateKey();
   clearUserEmail();
-  clearMDKFromMemory();
-}
-
-// Alias para clearAllStorage (para compatibilidade)
-export function clearAuth() {
-  clearAllStorage();
+  clearCriptographyCode();
+  clearDeviceName();
 }
 
 // ==================== CHECK AUTH ====================
 
 export function isAuthenticated(): boolean {
-  return getAccessToken() !== null;
-}
-
-export function hasDeviceSetup(): boolean {
-  return (
-    getDeviceId() !== null &&
-    localStorage.getItem(STORAGE_KEYS.PRIVATE_KEY) !== null
-  );
-}
-
-export function hasMDK(): boolean {
-  return mdkInMemory !== null;
+  return getAccessToken() !== null && hasCriptographyCode();
 }

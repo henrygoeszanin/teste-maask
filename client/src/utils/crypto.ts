@@ -1,6 +1,6 @@
 /**
- * Utilitários de criptografia para E2EE
- * Usa Web Crypto API nativa do navegador
+ * Utilitários de criptografia simplificados
+ * Usa apenas AES-GCM com criptografyCode do servidor
  */
 
 // ==================== CONVERSÃO DE DADOS ====================
@@ -32,27 +32,9 @@ export function bufferToHex(buffer: ArrayBuffer): string {
 // ==================== GERAÇÃO DE CHAVES ====================
 
 /**
- * Gera par de chaves RSA-4096 para o dispositivo
+ * Gera chave AES-256 para criptografia de arquivos
  */
-export async function generateDeviceKeyPair() {
-  const keyPair = await crypto.subtle.generateKey(
-    {
-      name: "RSA-OAEP",
-      modulusLength: 4096,
-      publicExponent: new Uint8Array([1, 0, 1]),
-      hash: "SHA-256",
-    },
-    true,
-    ["encrypt", "decrypt"]
-  );
-
-  return keyPair;
-}
-
-/**
- * Gera MDK (Master Decryption Key) - AES-256
- */
-export async function generateMDK(): Promise<CryptoKey> {
+export async function generateFileKey(): Promise<CryptoKey> {
   return await crypto.subtle.generateKey(
     {
       name: "AES-GCM",
@@ -64,15 +46,24 @@ export async function generateMDK(): Promise<CryptoKey> {
 }
 
 /**
- * Gera FEK (File Encryption Key) - AES-256
+ * Importa criptografyCode (string) como chave AES-GCM
  */
-export async function generateFEK(): Promise<CryptoKey> {
-  return await crypto.subtle.generateKey(
-    {
-      name: "AES-GCM",
-      length: 256,
-    },
-    true,
+export async function importCriptographyCode(
+  criptographyCode: string
+): Promise<CryptoKey> {
+  // Converte a string para bytes
+  const encoder = new TextEncoder();
+  const keyMaterial = encoder.encode(criptographyCode);
+
+  // Faz hash SHA-256 para obter 256 bits
+  const keyHash = await crypto.subtle.digest("SHA-256", keyMaterial);
+
+  // Importa como chave AES-GCM
+  return await crypto.subtle.importKey(
+    "raw",
+    keyHash,
+    { name: "AES-GCM" },
+    false,
     ["encrypt", "decrypt"]
   );
 }
@@ -112,52 +103,6 @@ export async function exportSymmetricKey(key: CryptoKey): Promise<string> {
 // ==================== IMPORTAÇÃO DE CHAVES ====================
 
 /**
- * Importa chave pública de formato PEM
- */
-export async function importPublicKeyFromPEM(pem: string): Promise<CryptoKey> {
-  const pemContents = pem
-    .replace("-----BEGIN PUBLIC KEY-----", "")
-    .replace("-----END PUBLIC KEY-----", "")
-    .replace(/\s/g, "");
-
-  const binaryDer = base64ToArrayBuffer(pemContents);
-
-  return await crypto.subtle.importKey(
-    "spki",
-    binaryDer,
-    {
-      name: "RSA-OAEP",
-      hash: "SHA-256",
-    },
-    true,
-    ["encrypt"]
-  );
-}
-
-/**
- * Importa chave privada de formato PEM
- */
-export async function importPrivateKeyFromPEM(pem: string): Promise<CryptoKey> {
-  const pemContents = pem
-    .replace("-----BEGIN PRIVATE KEY-----", "")
-    .replace("-----END PRIVATE KEY-----", "")
-    .replace(/\s/g, "");
-
-  const binaryDer = base64ToArrayBuffer(pemContents);
-
-  return await crypto.subtle.importKey(
-    "pkcs8",
-    binaryDer,
-    {
-      name: "RSA-OAEP",
-      hash: "SHA-256",
-    },
-    true,
-    ["decrypt"]
-  );
-}
-
-/**
  * Importa chave simétrica (AES) de base64
  */
 export async function importSymmetricKey(base64: string): Promise<CryptoKey> {
@@ -175,111 +120,59 @@ export async function importSymmetricKey(base64: string): Promise<CryptoKey> {
   );
 }
 
-// ==================== CRIPTOGRAFIA RSA ====================
-
-/**
- * Criptografa dados com chave pública RSA (para envelope)
- */
-export async function encryptWithPublicKey(
-  data: ArrayBuffer,
-  publicKey: CryptoKey
-): Promise<ArrayBuffer> {
-  return await crypto.subtle.encrypt(
-    {
-      name: "RSA-OAEP",
-    },
-    publicKey,
-    data
-  );
-}
-
-/**
- * Descriptografa dados com chave privada RSA (para envelope)
- */
-export async function decryptWithPrivateKey(
-  encryptedData: ArrayBuffer,
-  privateKey: CryptoKey
-): Promise<ArrayBuffer> {
-  return await crypto.subtle.decrypt(
-    {
-      name: "RSA-OAEP",
-    },
-    privateKey,
-    encryptedData
-  );
-}
-
 // ==================== CRIPTOGRAFIA AES-GCM ====================
 
 /**
- * Criptografa dados com AES-GCM
+ * Criptografa dados usando AES-GCM
  */
 export async function encryptWithAES(
   data: ArrayBuffer,
   key: CryptoKey,
-  iv: Uint8Array
-): Promise<{ ciphertext: ArrayBuffer; authTag: Uint8Array }> {
+  iv?: Uint8Array
+): Promise<{ ciphertext: ArrayBuffer; iv: Uint8Array; authTag: Uint8Array }> {
+  // Gera IV se não fornecido
+  const encryptionIv = iv || crypto.getRandomValues(new Uint8Array(12));
+
+  // Cria cópia do IV para compatibilidade de tipos
+  const ivCopy = new Uint8Array(encryptionIv);
+
   const encrypted = await crypto.subtle.encrypt(
     {
       name: "AES-GCM",
-      iv: iv as BufferSource,
-      tagLength: 128,
+      iv: ivCopy,
     },
     key,
     data
   );
 
-  // Em AES-GCM, os últimos 16 bytes são o authTag
-  const ciphertext = encrypted.slice(0, encrypted.byteLength - 16);
-  const authTag = new Uint8Array(encrypted.slice(encrypted.byteLength - 16));
-
-  return { ciphertext, authTag };
+  // Para AES-GCM, o auth tag está incluído no ciphertext
+  // Retornamos o ciphertext completo e o IV usado
+  return {
+    ciphertext: encrypted,
+    iv: encryptionIv,
+    authTag: new Uint8Array(0), // Não usado em AES-GCM separado
+  };
 }
 
 /**
- * Descriptografa dados com AES-GCM
+ * Descriptografa dados usando AES-GCM
  */
 export async function decryptWithAES(
-  ciphertext: ArrayBuffer,
+  encryptedData: ArrayBuffer,
   key: CryptoKey,
-  iv: Uint8Array,
-  authTag: Uint8Array
+  iv: Uint8Array
 ): Promise<ArrayBuffer> {
-  console.log("[Crypto] decryptWithAES:", {
-    ciphertextSize: ciphertext.byteLength,
-    ivSize: iv.byteLength,
-    authTagSize: authTag.byteLength,
-    keyType: key.type,
-    keyAlgorithm: key.algorithm,
-  });
+  // Cria uma cópia do IV para garantir compatibilidade de tipos
+  const ivCopy = new Uint8Array(iv);
 
-  // Concatena ciphertext + authTag para o decrypt
-  const combined = new Uint8Array(ciphertext.byteLength + authTag.byteLength);
-  combined.set(new Uint8Array(ciphertext), 0);
-  combined.set(authTag, ciphertext.byteLength);
-
-  try {
-    const decrypted = await crypto.subtle.decrypt(
-      {
-        name: "AES-GCM",
-        iv: iv as BufferSource,
-        tagLength: 128,
-      },
-      key,
-      combined
-    );
-    console.log(
-      "[Crypto] Descriptografia bem-sucedida, tamanho:",
-      decrypted.byteLength
-    );
-    return decrypted;
-  } catch (error) {
-    console.error("[Crypto] Falha na descriptografia AES-GCM:", error);
-    console.error(
-      "[Crypto] Possível causa: chave incorreta ou dados corrompidos"
-    );
-    throw error;
-  }
+  return await crypto.subtle.decrypt(
+    {
+      name: "AES-GCM",
+      iv: ivCopy,
+    },
+    key,
+    encryptedData
+  );
 }
 
 // ==================== UTILITÁRIOS ====================
@@ -292,21 +185,10 @@ export async function sha256(data: ArrayBuffer): Promise<ArrayBuffer> {
 }
 
 /**
- * Calcula fingerprint de chave pública
- */
-export async function calculateKeyFingerprint(
-  publicKey: CryptoKey
-): Promise<string> {
-  const exported = await crypto.subtle.exportKey("spki", publicKey);
-  const hash = await sha256(exported);
-  return bufferToHex(hash);
-}
-
-/**
- * Gera IV aleatório (16 bytes)
+ * Gera IV aleatório (12 bytes para AES-GCM)
  */
 export function generateIV(): Uint8Array {
-  return crypto.getRandomValues(new Uint8Array(16));
+  return crypto.getRandomValues(new Uint8Array(12));
 }
 
 /**

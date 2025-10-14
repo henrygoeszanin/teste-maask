@@ -9,23 +9,19 @@ export class DeviceController {
    */
   static async register(request: FastifyRequest, reply: FastifyReply) {
     const userId = request.user?.id!;
-    const { deviceId, publicKey, publicKeyFormat, keyFingerprint } =
-      request.body as RegisterDeviceDTO;
+    const { deviceName } = request.body as RegisterDeviceDTO;
 
     const deviceRepository = new DeviceRepository();
     const registerDeviceUseCase = new RegisterDeviceUseCase(deviceRepository);
 
     const device = await registerDeviceUseCase.execute({
       userId,
-      deviceId,
-      publicKey,
-      publicKeyFormat,
-      keyFingerprint,
+      deviceName,
     });
 
     return reply.status(201).send({
       id: device.id,
-      deviceId: device.deviceId,
+      deviceName: device.deviceName,
       status: device.status,
       createdAt: device.createdAt.toISOString(),
     });
@@ -43,10 +39,10 @@ export class DeviceController {
     return reply.send({
       devices: devices.map((device) => ({
         id: device.id,
-        deviceId: device.deviceId,
-        keyFingerprint: device.keyFingerprint,
+        deviceName: device.deviceName,
         status: device.status,
         createdAt: device.createdAt.toISOString(),
+        updatedAt: device.updatedAt.toISOString(),
       })),
     });
   }
@@ -77,10 +73,7 @@ export class DeviceController {
     return reply.send({
       data: {
         id: device.id,
-        deviceId: device.deviceId,
-        publicKey: device.publicKey,
-        publicKeyFormat: device.publicKeyFormat,
-        keyFingerprint: device.keyFingerprint,
+        deviceName: device.deviceName,
         status: device.status,
         createdAt: device.createdAt.toISOString(),
       },
@@ -92,12 +85,12 @@ export class DeviceController {
    */
   static async revoke(request: FastifyRequest, reply: FastifyReply) {
     const userId = request.user?.id!;
-    const { deviceId } = request.params as { deviceId: string };
+    const { deviceName } = request.params as { deviceName: string };
 
     const deviceRepository = new DeviceRepository();
 
     // Busca o dispositivo
-    const device = await deviceRepository.findByDeviceId(deviceId);
+    const device = await deviceRepository.findByDeviceName(deviceName);
 
     if (!device) {
       return reply.status(404).send({
@@ -112,13 +105,13 @@ export class DeviceController {
       });
     }
 
-    // Desativa o dispositivo
-    device.deactivate();
+    // Revoga o dispositivo
+    device.revoke();
     await deviceRepository.update(device);
 
     return reply.send({
       message: "Device revoked successfully",
-      deviceId: device.deviceId,
+      deviceName: device.deviceName,
       status: device.status,
     });
   }
