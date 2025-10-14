@@ -62,7 +62,14 @@ Construir uma API back-end (Node.js + TypeScript) que:
 ### Validação e Segurança
 
 - **Zod** - Schema validation para DTOs e validação de dados de entrada
+- **Argon2** - Hash de senhas com pepper e salt
+- **jsonwebtoken** - Geração e validação de tokens JWT (accessToken e refreshToken)
 - Middleware de validação customizado (`validateBody`) para validar requisições
+
+### Documentação
+
+- **@fastify/swagger** - Geração automática de especificação OpenAPI
+- **@fastify/swagger-ui** - Interface Swagger UI disponível em `/docs`
 
 ### Ambiente e Configuração
 
@@ -158,6 +165,39 @@ pnpm start    # Modo produção (requer build)
 pnpm test     # Testes (a implementar)
 ```
 
+## Documentação da API (Swagger/OpenAPI)
+
+A documentação interativa da API está disponível em: **`http://localhost:3000/docs`**
+
+### Rotas Implementadas
+
+#### POST /api/users
+
+- **Tag:** Users
+- **Descrição:** Criar um novo usuário
+- **Body:** `{ name, email, password }`
+- **Respostas:**
+  - `201`: Usuário criado com sucesso
+  - `409`: E-mail já cadastrado
+
+#### POST /api/auth/login
+
+- **Tag:** Auth
+- **Descrição:** Autenticar usuário e obter tokens JWT
+- **Body:** `{ email, password }`
+- **Respostas:**
+  - `200`: Retorna accessToken, refreshToken e dados do usuário
+  - `401`: Credenciais inválidas
+
+#### GET /api/health
+
+- **Tag:** Health
+- **Descrição:** Health check da API
+- **Respostas:**
+  - `200`: API funcionando corretamente
+
+> Toda rota possui schema OpenAPI completo com validação automática via Fastify + Swagger.
+
 ## Diretrizes para o Copilot
 
 Ao trabalhar neste projeto:
@@ -165,8 +205,9 @@ Ao trabalhar neste projeto:
 1. **Mantenha a Clean Architecture**: Respeite as camadas e suas responsabilidades
 2. **Use Zod para validação**: Todos os DTOs devem ser schemas Zod
 3. **Middleware de validação**: Use `validateBody(schema)` nas rotas que recebem dados
-4. **Streams para arquivos grandes**: Priorize streams ao lidar com uploads/downloads
-5. **Segurança em primeiro lugar**: Dados de perfis são altamente sensíveis
-6. **Performance é crítica**: O usuário não pode esperar muito para abrir/fechar navegadores
-7. **Documentação clara**: Documente rotas, decisões técnicas e trade-offs
-8. **TypeScript strict**: Mantenha tipagem forte em todo o código
+4. **Documentação Swagger**: Toda nova rota deve incluir `schema` com tags, description, body e responses
+5. **Streams para arquivos grandes**: Priorize streams ao lidar com uploads/downloads
+6. **Segurança em primeiro lugar**: Dados de perfis são altamente sensíveis
+7. **Performance é crítica**: O usuário não pode esperar muito para abrir/fechar navegadores
+8. **Documentação clara**: Documente rotas, decisões técnicas e trade-offs
+9. **TypeScript strict**: Mantenha tipagem forte em todo o código

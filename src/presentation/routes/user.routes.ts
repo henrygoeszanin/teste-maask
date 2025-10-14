@@ -1,10 +1,13 @@
 import { FastifyInstance } from "fastify";
 import { UserController } from "../controllers/UserController";
-import { validateBody } from "../middlewares/validateBody";
-import { RegisterSchema } from "@/application/dtos/user.dto";
-import { RegisterUseCase } from "@/application/usecases/registerUseCase";
-
+import {
+  RegisterSchema,
+  UserResponseSchema,
+  ErrorResponseSchema,
+} from "@/application/dtos/user.dto";
 import { UserRepository } from "@/infrastructure/repositories/UserRepository";
+import { ZodTypeProvider } from "fastify-type-provider-zod";
+import { RegisterUseCase } from "@/application/usecases/RegisterUseCase";
 
 export async function userRoutes(app: FastifyInstance) {
   const userRepository = new UserRepository();
@@ -12,9 +15,19 @@ export async function userRoutes(app: FastifyInstance) {
     new RegisterUseCase(userRepository)
   );
 
-  app.post(
+  app.withTypeProvider<ZodTypeProvider>().post(
     "/",
-    { preHandler: validateBody(RegisterSchema) },
+    {
+      schema: {
+        tags: ["Users"],
+        description: "Criar um novo usuário",
+        body: RegisterSchema,
+        response: {
+          201: UserResponseSchema,
+          409: ErrorResponseSchema,
+        },
+      },
+    },
     userController.create.bind(userController)
   );
 }

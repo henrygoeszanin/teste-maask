@@ -16,4 +16,17 @@ export const config = {
     parallelism: parseInt(process.env.ARGON2_PARALLELISM || "1", 10), // threads paralelos
     pepperVersion: parseInt(process.env.PEPPER_VERSION || "1", 10), // versão do pepper
   },
+  auth: {
+    jwtSecret: process.env.JWT_SECRET || "jwt_dev_secret",
+    jwtRefreshSecret:
+      process.env.JWT_REFRESH_SECRET || "jwt_dev_refresh_secret",
+    accessTokenExpiresIn: parseInt(
+      process.env.JWT_ACCESS_EXPIRES_IN || "900",
+      10
+    ), // 15 min
+    refreshTokenExpiresIn: parseInt(
+      process.env.JWT_REFRESH_EXPIRES_IN || "2592000",
+      10
+    ), // 30 dias
+  },
 } as const;

@@ -22,3 +22,19 @@ export const RegisterSchema = z.object({
 });
 
 export type RegisterDTO = z.infer<typeof RegisterSchema>;
+
+// Response schema for created user
+export const UserResponseSchema = z.object({
+  message: z.string(),
+  data: z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.email(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  }),
+});
+
+export const ErrorResponseSchema = z.object({
+  error: z.string(),
+});

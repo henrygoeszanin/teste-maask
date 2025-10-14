@@ -1,7 +1,7 @@
 import { RegisterDTO } from "@/application/dtos/user.dto";
-import { RegisterUseCase } from "@/application/usecases/registerUseCase";
 import { FastifyReply, FastifyRequest } from "fastify";
 import { UserAlreadyExistsError } from "@/domain/errors/UserAlreadyExistsError";
+import { RegisterUseCase } from "@/application/usecases/RegisterUseCase";
 
 export class UserController {
   constructor(private readonly registerUseCase: RegisterUseCase) {}
