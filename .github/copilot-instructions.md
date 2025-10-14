@@ -38,6 +38,8 @@ Construir uma API back-end (Node.js + TypeScript) que:
 - Tratamento como dado sensível (encriptação, autenticação, urls assinadas, dentre outros exemplos)
 - Documentação das rotas (OpenAPI ou Markdown)
 - Instruções para rodar localmente e testar
+- Lançamentos de erros em ingles
+- COmentários de codigo em portgues
 
 #### Considerações Técnicas
 
@@ -178,6 +180,139 @@ Ao trabalhar neste projeto:
 7. **Performance é crítica**: O usuário não pode esperar muito para abrir/fechar navegadores
 8. **Documentação clara**: Documente rotas, decisões técnicas e trade-offs
 9. **TypeScript strict**: Mantenha tipagem forte em todo o código
+
+### Convenções de Código para Rotas e DTOs
+
+#### Schemas Zod nos DTOs
+
+- **Nomenclatura**: Use **PascalCase** para schemas Zod (ex: `CreateUserSchema`, `UpdateUserSchema`)
+- **Tipos derivados**: Use o mesmo nome com sufixo `DTO` (ex: `type CreateUserDTO = z.infer<typeof CreateUserSchema>`)
+- **Schemas de resposta**: Sempre crie schemas de resposta para documentação Swagger
+  - Para respostas de sucesso com dados: envolva em um objeto `data`
+  - Para respostas de criação/atualização: use estrutura `{ message: string, data: {...} }`
+  - Para respostas de listagem/consulta simples: use estrutura `{ data: {...} }`
+- **Schema de erro**: Sempre exporte `ErrorResponseSchema` para respostas de erro
+
+Exemplo:
+
+```typescript
+// Schema de entrada
+export const CreateUserSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+});
+export type CreateUserDTO = z.infer<typeof CreateUserSchema>;
+
+// Schema de resposta de criação (201)
+export const UserCreatedResponseSchema = z.object({
+  message: z.string(),
+  data: z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.string(),
+    createdAt: z.string(),
+  }),
+});
+
+// Schema de resposta de consulta (200)
+export const UserDataResponseSchema = z.object({
+  data: z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.string(),
+  }),
+});
+
+// Schema de erro
+export const ErrorResponseSchema = z.object({
+  error: z.string(),
+});
+```
+
+#### Rotas com Fastify + Zod
+
+- **Type Provider**: Sempre use `.withTypeProvider<ZodTypeProvider>()` antes de definir rotas
+- **Helper de exemplos**: Use a função `withExamples` para adicionar exemplos aos schemas
+- **Schemas na configuração**:
+  - `body`: Schema Zod para body da requisição
+  - `querystring`: Schema Zod para query params
+  - `params`: Schema Zod para route params
+  - `headers`: Schema Zod para headers customizados
+  - `response`: Objeto com códigos HTTP e schemas de resposta
+- **Exemplos**: Sempre adicione pelo menos um exemplo para cada schema
+
+Exemplo:
+
+```typescript
+app.withTypeProvider<ZodTypeProvider>().post(
+  "/users",
+  {
+    schema: {
+      tags: ["Users"],
+      description: "Criar um novo usuário",
+      body: withExamples(CreateUserSchema, [
+        {
+          name: "João da Silva",
+          email: "joao@email.com",
+        },
+      ]),
+      response: {
+        201: withExamples(UserCreatedResponseSchema, [
+          {
+            message: "Usuário criado com sucesso",
+            data: {
+              id: "uuid-123",
+              name: "João da Silva",
+              email: "joao@email.com",
+              createdAt: "2025-10-14T12:00:00.000Z",
+            },
+          },
+        ]),
+        400: withExamples(ErrorResponseSchema, [
+          { error: "Invalid request body" },
+        ]),
+        409: withExamples(ErrorResponseSchema, [
+          { error: "Email already registered" },
+        ]),
+      },
+      security: [{ bearerAuth: [] }], // Se rota protegida
+    },
+  },
+  controller.create
+);
+```
+
+#### Controllers
+
+- **Respostas padronizadas**: Sempre retorne respostas no formato definido nos schemas
+- **Conversão de datas**: Converta `Date` para ISO string ao retornar (`.toISOString()`)
+- **Status codes apropriados**:
+  - `200` - Sucesso em consultas/atualizações
+  - `201` - Sucesso em criações
+  - `400` - Erro de validação
+  - `401` - Não autenticado
+  - `403` - Sem permissão
+  - `404` - Recurso não encontrado
+  - `409` - Conflito (ex: email já cadastrado)
+
+Exemplo:
+
+```typescript
+static async create(request: FastifyRequest, reply: FastifyReply) {
+  const data = request.body as CreateUserDTO;
+  const user = await useCase.execute(data);
+
+  return reply.status(201).send({
+    message: "Usuário criado com sucesso",
+    data: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      createdAt: user.createdAt.toISOString(),
+    },
+  });
+}
+```
 
 ## Commits
 

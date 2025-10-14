@@ -5,6 +5,7 @@ import {
   DeleteObjectCommand,
   HeadObjectCommand,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { config } from "@config/index";
 import { Readable } from "stream";
 
@@ -126,5 +127,56 @@ export class S3Service {
       lastModified: response.LastModified,
       contentType: response.ContentType,
     };
+  }
+
+  /**
+   * Gera uma URL assinada para upload direto ao S3
+   * @param key - Caminho/nome do arquivo no bucket
+   * @param expiresIn - Tempo de expiração em segundos (padrão: 3600 = 1 hora)
+   * @param contentType - Tipo MIME do arquivo
+   * @returns URL assinada para upload
+   */
+  async generatePresignedUploadUrl(
+    key: string,
+    expiresIn: number = 3600,
+    contentType?: string
+  ): Promise<string> {
+    const command = new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      ContentType: contentType,
+    });
+
+    const url = await getSignedUrl(this.client, command, { expiresIn });
+    return url;
+  }
+
+  /**
+   * Gera uma URL assinada para download direto do S3
+   * @param key - Caminho/nome do arquivo no bucket
+   * @param expiresIn - Tempo de expiração em segundos (padrão: 3600 = 1 hora)
+   * @returns URL assinada para download
+   */
+  async generatePresignedDownloadUrl(
+    key: string,
+    expiresIn: number = 3600
+  ): Promise<string> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+    });
+
+    const url = await getSignedUrl(this.client, command, { expiresIn });
+    return url;
+  }
+
+  /**
+   * Gera o caminho (key) para um arquivo no S3
+   * @param userId - ID do usuário
+   * @param fileId - ID único do arquivo
+   * @returns Caminho completo no formato: users/{userId}/files/{fileId}
+   */
+  generateFileKey(userId: string, fileId: string): string {
+    return `users/${userId}/files/${fileId}`;
   }
 }

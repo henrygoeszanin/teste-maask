@@ -8,6 +8,13 @@
       "when": 1760405704811,
       "tag": "0000_talented_kang",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1760464104698,
+      "tag": "0001_zippy_ezekiel",
+      "breakpoints": true
     }
   ]
 }
