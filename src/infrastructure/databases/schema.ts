@@ -22,7 +22,12 @@ export const devices = pgTable("devices", {
   publicKey: text("public_key").notNull(),
   publicKeyFormat: text("public_key_format").notNull(),
   keyFingerprint: text("key_fingerprint").notNull(),
-  status: text("status", { enum: ["active", "inactive"] }).notNull(),
+  status: text("status", { enum: ["active", "inactive", "revoked"] }).notNull(),
+  isMasterDevice: integer("is_master_device").default(0).notNull(), // 0 = false, 1 = true (SQLite compatibility)
+  revokedAt: timestamp("revoked_at"),
+  revokedBy: text("revoked_by"), // deviceId que executou a revogação
+  revocationReason: text("revocation_reason"),
+  lastSeen: timestamp("last_seen"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

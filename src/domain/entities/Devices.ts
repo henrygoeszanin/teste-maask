@@ -1,6 +1,6 @@
 import { ulid } from "ulid";
 
-export type DeviceStatus = "active" | "inactive";
+export type DeviceStatus = "active" | "inactive" | "revoked";
 
 export class Device {
   constructor(
@@ -11,6 +11,11 @@ export class Device {
     public publicKeyFormat: string, // formato da chave pública (ex: PEM, SPKI)
     public keyFingerprint: string, // fingerprint da chave pública (SHA-256)
     public status: DeviceStatus, // status do dispositivo
+    public isMasterDevice: number, // 0 = false, 1 = true
+    public revokedAt: Date | null,
+    public revokedBy: string | null, // deviceId que executou a revogação
+    public revocationReason: string | null,
+    public lastSeen: Date | null,
     public createdAt: Date,
     public updatedAt: Date
   ) {}
@@ -20,7 +25,8 @@ export class Device {
     deviceId: string,
     publicKey: string,
     publicKeyFormat: string,
-    keyFingerprint: string
+    keyFingerprint: string,
+    isMasterDevice: boolean = false
   ): Device {
     return new Device(
       ulid(), // id
@@ -30,6 +36,11 @@ export class Device {
       publicKeyFormat,
       keyFingerprint,
       "active", // status inicial sempre "active"
+      isMasterDevice ? 1 : 0, // isMasterDevice (0 = false, 1 = true)
+      null, // revokedAt
+      null, // revokedBy
+      null, // revocationReason
+      new Date(), // lastSeen
       new Date(), // createdAt
       new Date() // updatedAt
     );
@@ -45,7 +56,33 @@ export class Device {
     this.updatedAt = new Date();
   }
 
+  revoke(revokedBy: string, reason?: string): void {
+    this.status = "revoked";
+    this.revokedAt = new Date();
+    this.revokedBy = revokedBy;
+    this.revocationReason = reason || null;
+    this.updatedAt = new Date();
+  }
+
   isActive(): boolean {
     return this.status === "active";
+  }
+
+  isRevoked(): boolean {
+    return this.status === "revoked";
+  }
+
+  isMaster(): boolean {
+    return this.isMasterDevice === 1;
+  }
+
+  setAsMaster(): void {
+    this.isMasterDevice = 1;
+    this.updatedAt = new Date();
+  }
+
+  removeAsMaster(): void {
+    this.isMasterDevice = 0;
+    this.updatedAt = new Date();
   }
 }

@@ -16,6 +16,11 @@ export class DeviceRepository implements IDeviceRepository {
         publicKeyFormat: device.publicKeyFormat,
         keyFingerprint: device.keyFingerprint,
         status: device.status,
+        isMasterDevice: device.isMasterDevice,
+        revokedAt: device.revokedAt,
+        revokedBy: device.revokedBy,
+        revocationReason: device.revocationReason,
+        lastSeen: device.lastSeen,
         createdAt: device.createdAt,
         updatedAt: device.updatedAt,
       })
@@ -67,6 +72,11 @@ export class DeviceRepository implements IDeviceRepository {
         publicKeyFormat: device.publicKeyFormat,
         keyFingerprint: device.keyFingerprint,
         status: device.status,
+        isMasterDevice: device.isMasterDevice,
+        revokedAt: device.revokedAt,
+        revokedBy: device.revokedBy,
+        revocationReason: device.revocationReason,
+        lastSeen: device.lastSeen,
         updatedAt: device.updatedAt,
       })
       .where(eq(devices.id, device.id))
@@ -79,6 +89,37 @@ export class DeviceRepository implements IDeviceRepository {
     await db.delete(devices).where(eq(devices.id, id));
   }
 
+  async revoke(
+    deviceId: string,
+    metadata: { revokedBy: string; reason: string }
+  ): Promise<void> {
+    await db
+      .update(devices)
+      .set({
+        status: "revoked",
+        revokedAt: new Date(),
+        revokedBy: metadata.revokedBy,
+        revocationReason: metadata.reason,
+        updatedAt: new Date(),
+      })
+      .where(eq(devices.id, deviceId));
+  }
+
+  async countMasterDevices(userId: string): Promise<number> {
+    const results = await db
+      .select()
+      .from(devices)
+      .where(
+        and(
+          eq(devices.userId, userId),
+          eq(devices.isMasterDevice, 1),
+          eq(devices.status, "active")
+        )
+      );
+
+    return results.length;
+  }
+
   private mapToEntity(row: typeof devices.$inferSelect): Device {
     return new Device(
       row.id,
@@ -88,6 +129,11 @@ export class DeviceRepository implements IDeviceRepository {
       row.publicKeyFormat,
       row.keyFingerprint,
       row.status as DeviceStatus,
+      row.isMasterDevice,
+      row.revokedAt,
+      row.revokedBy,
+      row.revocationReason,
+      row.lastSeen,
       row.createdAt,
       row.updatedAt
     );

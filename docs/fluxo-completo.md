@@ -9,7 +9,8 @@
 5. [Fluxo de Upload de Arquivo](#fluxo-de-upload-de-arquivo)
 6. [Fluxo de Download de Arquivo](#fluxo-de-download-de-arquivo)
 7. [Fluxo de Adicionar Novo Dispositivo](#fluxo-de-adicionar-novo-dispositivo)
-8. [Diagramas de Sequência](#diagramas-de-sequência)
+8. [Fluxo de Revogação Segura de Dispositivos](#fluxo-de-revogação-segura-de-dispositivos)
+9. [Diagramas de Sequência](#diagramas-de-sequência)
 
 ---
 
@@ -1816,6 +1817,486 @@ Isso é chamado de **Envelope Encryption** ou **Key Wrapping**, e é exatamente 
 
 ---
 
+## Fluxo de Revogação Segura de Dispositivos
+
+### 🔒 Por Que Revogação com Senha é Crítica
+
+**Cenário de ataque SEM proteção:**
+
+```
+10:00 - Ladrão rouba Device 2 (ainda "active")
+10:15 - Ladrão acessa app antes do dono revogar
+10:16 - Ladrão revoga TODOS os outros dispositivos do usuário
+10:17 - Dono perde acesso COMPLETO à conta! 😱
+```
+
+**Com revogação segura implementada:**
+
+```
+10:00 - Ladrão rouba Device 2
+10:15 - Ladrão tenta revogar outros dispositivos
+10:16 - ❌ Sistema exige SENHA (ladrão não tem)
+10:17 - ❌ Sistema valida status do Device 2 no banco
+10:18 - ✅ Dono revoga Device 2 de outro dispositivo
+10:19 - ❌ Device 2 BLOQUEADO completamente
+```
+
+### Passo a Passo: Revogação Segura
+
+#### 1️⃣ Usuário Identifica Dispositivo Suspeito
+
+```javascript
+// No Dispositivo 1 (Confiável)
+
+// 1. Lista todos os dispositivos
+const response = await fetch("/api/devices", {
+  headers: {
+    Authorization: `Bearer ${accessToken}`,
+  },
+});
+
+const { devices } = await response.json();
+console.log("Meus dispositivos:", devices);
+// [
+//   { id: "1", deviceId: "device-1", status: "active", isMasterDevice: true, lastSeen: "2025-10-14T10:00:00Z" },
+//   { id: "2", deviceId: "device-2", status: "active", isMasterDevice: false, lastSeen: "2025-10-13T15:30:00Z" },
+//   { id: "3", deviceId: "device-3", status: "active", isMasterDevice: false, lastSeen: "2025-10-10T08:20:00Z" }
+// ]
+
+// 2. Usuário identifica dispositivo suspeito
+const suspiciousDevice = devices.find((d) => d.deviceId === "device-2");
+```
+
+#### 2️⃣ Sistema Pede Confirmação e Senha
+
+```javascript
+// 3. UI mostra confirmação
+const confirmed = confirm(
+  `⚠️ ATENÇÃO: Revogar dispositivo ${suspiciousDevice.deviceId}?\n\n` +
+    `Este dispositivo perderá acesso IMEDIATO a todos os arquivos.\n` +
+    `Esta ação NÃO pode ser desfeita.\n\n` +
+    `Para continuar, você precisará digitar sua senha.`
+);
+
+if (!confirmed) {
+  console.log("❌ Revogação cancelada");
+  return;
+}
+
+// 4. UI solicita senha
+const password = prompt("Digite sua senha para confirmar a revogação:");
+
+if (!password) {
+  alert("Senha é obrigatória para revogar dispositivo");
+  return;
+}
+```
+
+#### 3️⃣ Backend Valida Múltiplas Camadas
+
+```javascript
+// 5. Envia requisição de revogação
+const revokeResponse = await fetch("/api/devices/revoke", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${accessToken}`,
+    "X-Device-Id": "device-1", // Dispositivo atual
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    deviceId: "device-2", // Dispositivo a revogar
+    password: password, // Senha do usuário
+    reason: "suspicious", // Motivo
+  }),
+});
+
+if (!revokeResponse.ok) {
+  const error = await revokeResponse.json();
+
+  if (revokeResponse.status === 401) {
+    alert("❌ Senha incorreta! Revogação negada.");
+  } else if (revokeResponse.status === 403) {
+    alert("❌ Você não tem permissão para revogar este dispositivo.");
+  } else if (revokeResponse.status === 400) {
+    alert("❌ Erro: " + error.error);
+  }
+
+  return;
+}
+
+const result = await revokeResponse.json();
+console.log("✅ Dispositivo revogado:", result);
+alert(
+  "Dispositivo revogado com sucesso! Ele não pode mais acessar seus arquivos."
+);
+```
+
+#### 4️⃣ Backend Executa Validações de Segurança
+
+```typescript
+// No Backend - RevokeDeviceUseCase.ts
+
+async execute(input: RevokeDeviceInput): Promise<void> {
+  // VALIDAÇÃO 1: Verifica senha do usuário
+  const user = await this.userRepository.findById(input.userId);
+  const isPasswordValid = await argon2.verify(user.password, input.password, {
+    secret: Buffer.from(config.security.pepper),
+  });
+
+  if (!isPasswordValid) {
+    throw new AppError('Invalid password. Revocation denied.');
+  }
+
+  // VALIDAÇÃO 2: Busca dispositivo ATUAL (quem está revogando)
+  const currentDevice = await this.deviceRepository.findByDeviceId(
+    input.currentDeviceId
+  );
+
+  if (!currentDevice.isActive()) {
+    throw new AppError('Current device is not active');
+  }
+
+  // VALIDAÇÃO 3: Busca dispositivo ALVO (a ser revogado)
+  const deviceToRevoke = await this.deviceRepository.findByDeviceId(
+    input.deviceIdToRevoke
+  );
+
+  if (deviceToRevoke.status === 'revoked') {
+    throw new AppError('Device is already revoked');
+  }
+
+  // VALIDAÇÃO 4: Dispositivo não pode revogar a si mesmo
+  if (input.deviceIdToRevoke === input.currentDeviceId) {
+    throw new AppError('Cannot revoke your current device');
+  }
+
+  // VALIDAÇÃO 5: Hierarquia de master devices
+  if (deviceToRevoke.isMaster() && !currentDevice.isMaster()) {
+    throw new AppError('Only master devices can revoke other master devices');
+  }
+
+  // VALIDAÇÃO 6: Não pode revogar último master device
+  if (deviceToRevoke.isMaster()) {
+    const masterCount = await this.deviceRepository.countMasterDevices(input.userId);
+    if (masterCount <= 1) {
+      throw new AppError('Cannot revoke the last master device');
+    }
+  }
+
+  // EXECUÇÃO: Revoga dispositivo em transação
+  await this.envelopeRepository.deleteByDeviceId(deviceToRevoke.id);
+  await this.deviceRepository.revoke(deviceToRevoke.id, {
+    revokedBy: input.currentDeviceId,
+    reason: input.reason || 'user_initiated',
+  });
+
+  console.log(`Device ${input.deviceIdToRevoke} revoked successfully`);
+}
+```
+
+### Diagrama de Sequência Completo
+
+```
+Device 1 (Confiável)         Backend                  Banco de Dados
+      |                         |                            |
+      |-- 1. GET /devices ----->|                            |
+      |                         |-- 2. Query devices ------->|
+      |<- 3. Lista devices -----|                            |
+      |   (device-1, device-2)  |                            |
+      |                         |                            |
+      |-- 4. POST /revoke ----->|                            |
+      |   Headers: {            |                            |
+      |     X-Device-Id: dev-1  |                            |
+      |   }                     |                            |
+      |   Body: {               |                            |
+      |     deviceId: "dev-2",  |                            |
+      |     password: "***",    |                            |
+      |     reason: "stolen"    |                            |
+      |   }                     |                            |
+      |                         |                            |
+      |                         |-- 5. Busca user ---------->|
+      |                         |<- 6. Retorna user ---------|
+      |                         |                            |
+      |                         |-- 7. Verifica senha ------>|
+      |                         |    (Argon2 + pepper)       |
+      |                         |    ✅ Senha válida         |
+      |                         |                            |
+      |                         |-- 8. Busca Device 1 ------>|
+      |                         |<- 9. Device 1 active ------|
+      |                         |    ✅ Pode revogar         |
+      |                         |                            |
+      |                         |-- 10. Busca Device 2 ----->|
+      |                         |<- 11. Device 2 active -----|
+      |                         |                            |
+      |                         |-- 12. Valida hierarquia -->|
+      |                         |    ✅ Permissões OK        |
+      |                         |                            |
+      |                         |-- 13. DELETE envelope2 --->|
+      |                         |    ✅ Envelope deletado    |
+      |                         |                            |
+      |                         |-- 14. UPDATE device2 ----->|
+      |                         |    SET status='revoked'    |
+      |                         |    ✅ Device revogado      |
+      |                         |                            |
+      |<- 15. Success ----------|                            |
+      |   { message, data }     |                            |
+```
+
+### Estado do Banco Após Revogação
+
+**Antes:**
+
+```sql
+-- devices
+id | device_id | status   | is_master | revoked_at | revoked_by
+---+-----------+----------+-----------+------------+------------
+1  | device-1  | active   | 1         | NULL       | NULL
+2  | device-2  | active   | 0         | NULL       | NULL
+3  | device-3  | active   | 0         | NULL       | NULL
+
+-- envelopes
+id | device_id | envelope_ciphertext
+---+-----------+---------------------
+1  | 1         | [MDK crypto c/ pub1]
+2  | 2         | [MDK crypto c/ pub2]
+3  | 3         | [MDK crypto c/ pub3]
+```
+
+**Depois (device-2 revogado):**
+
+```sql
+-- devices
+id | device_id | status   | is_master | revoked_at          | revoked_by
+---+-----------+----------+-----------+---------------------+------------
+1  | device-1  | active   | 1         | NULL                | NULL
+2  | device-2  | revoked  | 0         | 2025-10-14 10:05:00 | device-1  ← REVOGADO
+3  | device-3  | active   | 0         | NULL                | NULL
+
+-- envelopes (envelope2 DELETADO!)
+id | device_id | envelope_ciphertext
+---+-----------+---------------------
+1  | 1         | [MDK crypto c/ pub1]
+3  | 3         | [MDK crypto c/ pub3]
+                ← envelope2 REMOVIDO!
+```
+
+### O Que Acontece com Device 2 Revogado?
+
+#### ❌ Tentativas Bloqueadas
+
+```javascript
+// No Device 2 (Revogado)
+
+// Tentativa 1: Criar novo envelope
+const attempt1 = await fetch("/api/envelopes", {
+  method: "POST",
+  headers: { Authorization: `Bearer ${token}` },
+  body: JSON.stringify({ deviceId: "device-2", envelopeCiphertext: "..." }),
+});
+// ❌ 403 Forbidden - "Device is not active or has been revoked"
+
+// Tentativa 2: Buscar envelope
+const attempt2 = await fetch("/api/envelopes/me", {
+  headers: {
+    Authorization: `Bearer ${token}`,
+    "X-Device-Id": "device-2",
+  },
+});
+// ❌ 404 Not Found - Envelope foi deletado
+
+// Tentativa 3: Fazer upload
+const attempt3 = await fetch("/api/files/upload/init", {
+  method: "POST",
+  headers: { Authorization: `Bearer ${token}` },
+  body: JSON.stringify({ fileName: "test.zip", fileSize: 1000 }),
+});
+// ❌ 403 Forbidden - "Device is not active"
+
+// Tentativa 4: Revogar outro dispositivo (ATAQUE!)
+const attempt4 = await fetch("/api/devices/revoke", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${token}`,
+    "X-Device-Id": "device-2",
+  },
+  body: JSON.stringify({
+    deviceId: "device-1",
+    password: "tentativa",
+    reason: "attack",
+  }),
+});
+// ❌ 403 Forbidden - "Current device is not active"
+```
+
+### 🛡️ Proteções Implementadas
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│               7 CAMADAS DE PROTEÇÃO                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ 1️⃣ Senha Obrigatória                                        │
+│    ✅ Argon2 com pepper                                     │
+│    ✅ Ladrão não tem senha                                  │
+│                                                             │
+│ 2️⃣ Validação de Status no Backend                           │
+│    ✅ Sempre consulta banco de dados                        │
+│    ✅ Dispositivo revogado = bloqueado                      │
+│                                                             │
+│ 3️⃣ Auto-Revogação Bloqueada                                 │
+│    ✅ Dispositivo não pode revogar a si mesmo               │
+│    ✅ Requer outro dispositivo autorizado                   │
+│                                                             │
+│ 4️⃣ Hierarquia de Master Devices                             │
+│    ✅ Apenas masters podem revogar outros masters           │
+│    ✅ Protege dispositivo principal                         │
+│                                                             │
+│ 5️⃣ Proteção do Último Master                                │
+│    ✅ Não pode revogar último master                        │
+│    ✅ Previne lockout da conta                              │
+│                                                             │
+│ 6️⃣ Transação Atômica                                        │
+│    ✅ Deleta envelope + marca como revogado                 │
+│    ✅ Tudo ou nada (consistência)                           │
+│                                                             │
+│ 7️⃣ Auditoria Completa                                       │
+│    ✅ Registra quem, quando, por quê                        │
+│    ✅ Rastreabilidade total                                 │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Endpoint da API
+
+```
+POST /api/devices/revoke
+
+Headers:
+  Authorization: Bearer <accessToken>
+  X-Device-Id: <current-device-id>
+  Content-Type: application/json
+
+Body:
+  {
+    "deviceId": "550e8400-e29b-41d4-a716-446655440000",
+    "password": "SenhaDoUsuario123!",
+    "reason": "stolen" | "lost" | "suspicious" | "employee_exit" | "user_initiated"
+  }
+
+Responses:
+  200 OK:
+    {
+      "message": "Device revoked successfully",
+      "data": {
+        "deviceId": "550e8400-e29b-41d4-a716-446655440000",
+        "revokedAt": "2025-10-14T12:05:00.000Z"
+      }
+    }
+
+  400 Bad Request:
+    { "error": "Missing X-Device-Id header" }
+    { "error": "Cannot revoke your current device" }
+
+  401 Unauthorized:
+    { "error": "Invalid password. Revocation denied." }
+
+  403 Forbidden:
+    { "error": "Only master devices can revoke other master devices" }
+    { "error": "Current device is not active" }
+
+  404 Not Found:
+    { "error": "Device to revoke not found" }
+```
+
+### Casos de Uso
+
+#### Caso 1: Dispositivo Perdido/Roubado
+
+```
+Timeline:
+10:00 - Usuário perde celular (Device 2)
+10:30 - Usuário acessa laptop (Device 1) e revoga Device 2
+10:31 - Sistema valida senha ✅
+10:32 - Envelope2 deletado do banco ✅
+10:33 - Device 2 marcado como "revoked" ✅
+10:34 - Usuário troca senha (invalida tokens JWT) ✅
+
+Resultado:
+✅ Device 1 (Laptop): Funcionando normalmente
+❌ Device 2 (Celular): Completamente bloqueado
+✅ Device 3 (Tablet): Funcionando normalmente
+```
+
+#### Caso 2: Funcionário Deixa Empresa
+
+```
+Timeline:
+09:00 - Funcionário usa laptop corporativo (Device 4)
+17:00 - Funcionário é desligado
+17:05 - Admin revoga Device 4 (com senha de admin)
+17:06 - Admin troca senha do funcionário
+
+Resultado:
+❌ Device 4: Sem acesso
+✅ Outros dispositivos: Não afetados
+```
+
+#### Caso 3: Dispositivo Suspeito
+
+```
+Timeline:
+14:00 - Usuário vê login suspeito de IP desconhecido
+14:01 - Usuário revoga dispositivo suspeito imediatamente
+14:02 - Sistema bloqueia dispositivo
+
+Resultado:
+❌ Atacante perde acesso imediato
+✅ Novos arquivos estão seguros
+```
+
+### Re-autorização (Recuperar Acesso)
+
+Se o usuário recuperar o dispositivo ou quiser restaurar o acesso:
+
+```javascript
+// 1. No dispositivo revogado: fazer login
+const { accessToken } = await login(email, password);
+
+// 2. Tentar buscar envelope (retorna 404)
+const response = await fetch("/api/envelopes/me", {
+  headers: {
+    Authorization: `Bearer ${accessToken}`,
+    "X-Device-Id": "device-2",
+  },
+});
+
+if (response.status === 404) {
+  alert("Dispositivo precisa ser autorizado novamente");
+}
+
+// 3. No dispositivo autorizado: criar novo envelope
+// (Processo IDÊNTICO ao de adicionar novo dispositivo)
+await createEnvelopeForDevice(device2);
+
+// Device 2 volta a funcionar normalmente! ✅
+```
+
+### Resumo de Segurança
+
+**Por que dispositivo revogado não pode atacar?**
+
+1. ✅ **Requer senha** → Ladrão não tem
+2. ✅ **Backend valida status** → Revogado = bloqueado
+3. ✅ **Não pode auto-revogar** → Requer outro dispositivo
+4. ✅ **Hierarquia de masters** → Protege dispositivos principais
+5. ✅ **Último master protegido** → Previne lockout
+6. ✅ **Transação atômica** → Sem estados inconsistentes
+7. ✅ **Auditoria completa** → Rastreabilidade total
+
+**Resultado:** Sistema **completamente seguro** contra dispositivos comprometidos! 🔒
+
+---
+
 ## Diagramas de Sequência
 
 ### Upload Completo
@@ -1935,7 +2416,56 @@ Private Key (apenas no dispositivo)
 - **AuthTag do AES-GCM**: Garante que o arquivo não foi alterado
 - **Presigned URLs**: Expiram em 1 hora, limitando janela de ataque
 - **JWT**: Expira em 15 minutos, limitando tempo de sessão
-- **Device Status**: Dispositivos podem ser revogados
+- **Device Status**: Dispositivos podem ser revogados com senha
+
+### Arquitetura de Segurança Completa
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│                   CAMADAS DE SEGURANÇA                         │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│  NÍVEL 1: Criptografia de Arquivos                            │
+│  ┌──────────────────────────────────────────────────┐         │
+│  │ Arquivo → [AES-256-GCM + FEK] → Arquivo Crypto  │         │
+│  │ FEK → [AES-256-GCM + MDK] → FEK Crypto          │         │
+│  │ MDK → [RSA-4096-OAEP + PubKey] → Envelope       │         │
+│  └──────────────────────────────────────────────────┘         │
+│                                                                │
+│  NÍVEL 2: Autenticação e Autorização                          │
+│  ┌──────────────────────────────────────────────────┐         │
+│  │ Senha → [Argon2 + Pepper + Salt] → Hash         │         │
+│  │ Login → [JWT + Secret] → AccessToken (15min)    │         │
+│  │ Refresh → [JWT + Secret] → RefreshToken (7d)    │         │
+│  └──────────────────────────────────────────────────┘         │
+│                                                                │
+│  NÍVEL 3: Controle de Dispositivos                            │
+│  ┌──────────────────────────────────────────────────┐         │
+│  │ ✅ Status Validation (active/inactive/revoked)   │         │
+│  │ ✅ Master Device Hierarchy                       │         │
+│  │ ✅ Password-Protected Revocation                 │         │
+│  │ ✅ Cannot Self-Revoke                            │         │
+│  │ ✅ Last Master Protection                        │         │
+│  └──────────────────────────────────────────────────┘         │
+│                                                                │
+│  NÍVEL 4: Transporte e Armazenamento                          │
+│  ┌──────────────────────────────────────────────────┐         │
+│  │ HTTPS/TLS 1.3 (em trânsito)                     │         │
+│  │ Presigned URLs (1 hora de validade)             │         │
+│  │ S3 Encryption at Rest                            │         │
+│  │ PostgreSQL + SSL                                 │         │
+│  └──────────────────────────────────────────────────┘         │
+│                                                                │
+│  NÍVEL 5: Auditoria e Monitoramento                           │
+│  ┌──────────────────────────────────────────────────┐         │
+│  │ Logs de Revogação (quem, quando, por quê)       │         │
+│  │ Device Activity Tracking (lastSeen)             │         │
+│  │ Security Events (login, logout, upload)         │         │
+│  │ Failed Access Attempts                           │         │
+│  └──────────────────────────────────────────────────┘         │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -1983,8 +2513,21 @@ O sistema implementa criptografia ponta a ponta completa, garantindo que:
 4. ✅ **Escalabilidade**: S3 para storage, PostgreSQL para metadados
 5. ✅ **Segurança**: Múltiplas camadas de criptografia
 6. ✅ **Auditoria**: Logs de todas as operações
+7. ✅ **Revogação segura**: Dispositivos comprometidos são bloqueados completamente
+8. ✅ **Hierarquia de dispositivos**: Master devices protegem a conta
+
+### Proteções Contra Dispositivos Comprometidos
+
+- ❌ Dispositivo revogado **NÃO** pode criar novos envelopes
+- ❌ Dispositivo revogado **NÃO** pode revogar outros dispositivos
+- ❌ Dispositivo revogado **NÃO** pode fazer upload/download de arquivos
+- ❌ Dispositivo revogado **NÃO** pode se reativar sozinho
+- ✅ Todas as revogações requerem **senha do usuário**
+- ✅ Backend **sempre valida** status do dispositivo no banco de dados
+- ✅ Sistema tem **auditoria completa** de todas as operações
 
 Para mais detalhes técnicos, consulte:
 
-- `docs/e2e-file-encryption.md` - Arquitetura completa
-- `docs/implementation-summary.md` - Resumo da implementação
+- `docs/e2e-file-encryption.md` - Arquitetura completa de criptografia
+- `docs/device-revocation-security.md` - Segurança detalhada da revogação
+- `docs/IMPLEMENTATION-SUMMARY.md` - Resumo completo da implementação

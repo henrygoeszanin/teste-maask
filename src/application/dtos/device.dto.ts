@@ -73,3 +73,24 @@ export const updateDeviceStatusSchema = z.object({
 });
 
 export type UpdateDeviceStatusDTO = z.infer<typeof updateDeviceStatusSchema>;
+
+// Schema para revogar dispositivo (requer senha)
+export const RevokeDeviceSchema = z.object({
+  deviceId: z.string().uuid("deviceId deve ser um UUID válido"),
+  password: z.string().min(1, "Senha é obrigatória"),
+  reason: z
+    .enum(["lost", "stolen", "suspicious", "employee_exit", "user_initiated"])
+    .optional()
+    .describe("Motivo da revogação"),
+});
+
+export type RevokeDeviceDTO = z.infer<typeof RevokeDeviceSchema>;
+
+// Schema de resposta para revogação
+export const RevokeDeviceResponseSchema = z.object({
+  message: z.string(),
+  data: z.object({
+    deviceId: z.string().uuid(),
+    revokedAt: z.string().datetime(),
+  }),
+});

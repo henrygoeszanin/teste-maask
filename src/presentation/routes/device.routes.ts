@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { DeviceController } from "@/presentation/controllers/DeviceController";
+import { DeviceRevocationController } from "@/presentation/controllers/DeviceRevocationController";
 import { authenticate } from "@/presentation/middlewares/authenticate";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
@@ -9,6 +10,8 @@ import {
   DeviceListResponseSchema,
   DeviceRevokeResponseSchema,
   DeviceErrorResponseSchema,
+  RevokeDeviceSchema,
+  RevokeDeviceResponseSchema,
 } from "@/application/dtos/device.dto";
 
 // Helper para adicionar exemplos aos schemas Zod
@@ -91,38 +94,57 @@ export async function deviceRoutes(app: FastifyInstance) {
     DeviceController.list
   );
 
-  // Revogar (desativar) dispositivo
-  app.withTypeProvider<ZodTypeProvider>().delete(
-    "/devices/:deviceId",
+  // ⚠️ Revogar dispositivo com segurança reforçada (requer senha)
+  app.withTypeProvider<ZodTypeProvider>().post(
+    "/devices/revoke",
     {
       preHandler: authenticate,
       schema: {
         tags: ["Devices"],
-        description: "Revoga (desativa) um dispositivo (requer Bearer token)",
-        params: z.object({
-          deviceId: z.string().uuid("deviceId deve ser um UUID válido"),
+        description:
+          "⚠️ Revoga um dispositivo de forma SEGURA (requer senha do usuário). " +
+          "Proteções: senha obrigatória, dispositivo não pode revogar a si mesmo, " +
+          "apenas master devices podem revogar outros master devices",
+        headers: z.object({
+          "x-device-id": z.string().uuid("Device ID deve ser um UUID válido"),
         }),
+        body: withExamples(RevokeDeviceSchema, [
+          {
+            deviceId: "550e8400-e29b-41d4-a716-446655440000",
+            password: "SenhaDoUsuario123!",
+            reason: "stolen",
+          },
+        ]),
         response: {
-          200: withExamples(DeviceRevokeResponseSchema, [
+          200: withExamples(RevokeDeviceResponseSchema, [
             {
               message: "Device revoked successfully",
-              deviceId: "550e8400-e29b-41d4-a716-446655440000",
-              status: "inactive",
+              data: {
+                deviceId: "550e8400-e29b-41d4-a716-446655440000",
+                revokedAt: "2025-10-14T12:05:00.000Z",
+              },
             },
           ]),
+          400: withExamples(DeviceErrorResponseSchema, [
+            { error: "Missing X-Device-Id header" },
+            { error: "Cannot revoke your current device" },
+          ]),
           401: withExamples(DeviceErrorResponseSchema, [
-            { error: "Token not provided" },
+            { error: "Invalid password. Revocation denied." },
           ]),
           403: withExamples(DeviceErrorResponseSchema, [
-            { error: "You do not have permission to revoke this device" },
+            {
+              error:
+                "Only master devices can revoke other master devices. Please use your primary device.",
+            },
           ]),
           404: withExamples(DeviceErrorResponseSchema, [
-            { error: "Device not found" },
+            { error: "Device to revoke not found" },
           ]),
         },
         security: [{ bearerAuth: [] }],
       },
     },
-    DeviceController.revoke
+    DeviceRevocationController.revokeDevice
   );
 }
