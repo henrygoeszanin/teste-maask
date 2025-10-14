@@ -1,0 +1,79 @@
+# =================================================================================
+# BASE: common setup (Node + pnpm)
+# =================================================================================
+FROM node:22.19-alpine3.21 AS base
+
+WORKDIR /app
+
+# Instala pnpm (evita Corepack)
+ENV PNPM_VERSION=10
+RUN npm i -g pnpm@${PNPM_VERSION}
+
+# =================================================================================
+# STAGE 1: DEPS (instala todas as dependências)
+# =================================================================================
+FROM base AS deps
+
+WORKDIR /app
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+# Copia configurações do Drizzle ORM
+COPY drizzle.config.ts ./
+COPY drizzle ./drizzle
+
+# =================================================================================
+# STAGE 2: BUILD (compila o projeto)
+# =================================================================================
+FROM deps AS builder
+
+WORKDIR /app
+COPY . .
+RUN pnpm build
+
+# =================================================================================
+# STAGE 3: PROD-DEPS (prune para apenas dependências de produção)
+# =================================================================================
+FROM deps AS prod-deps
+
+WORKDIR /app
+RUN pnpm prune --prod
+
+# =================================================================================
+# STAGE 4: PRODUCTION (runtime enxuto)
+# =================================================================================
+FROM node:22.19-alpine3.21 AS production
+
+WORKDIR /usr/src/api
+
+
+# Copy only production files
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/drizzle ./drizzle
+COPY --from=builder /app/drizzle.config.ts ./
+
+# Set production environment
+ENV NODE_OPTIONS="--max-old-space-size=256"
+ENV NODE_ENV=production
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# Change ownership
+RUN chown -R nodejs:nodejs /usr/src/api
+
+# Switch to non-root user
+USER nodejs
+
+# Expose port
+EXPOSE 3000
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+
+# Command to run the application
+CMD ["node", "dist/main.js"]

@@ -1,0 +1,38 @@
+version: "3.8"
+
+services:
+  # Application (API)
+  api:
+    build:
+      context: .
+      dockerfile: dockerfile
+      target: production
+    container_name: maask-api
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    environment:
+      # Server
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - ./drizzle:/usr/src/api/drizzle:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})",
+        ]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+
+networks:
+  default:
+    name: maask-network
