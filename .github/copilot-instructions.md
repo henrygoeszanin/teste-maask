@@ -165,39 +165,6 @@ pnpm start    # Modo produção (requer build)
 pnpm test     # Testes (a implementar)
 ```
 
-## Documentação da API (Swagger/OpenAPI)
-
-A documentação interativa da API está disponível em: **`http://localhost:3000/docs`**
-
-### Rotas Implementadas
-
-#### POST /api/users
-
-- **Tag:** Users
-- **Descrição:** Criar um novo usuário
-- **Body:** `{ name, email, password }`
-- **Respostas:**
-  - `201`: Usuário criado com sucesso
-  - `409`: E-mail já cadastrado
-
-#### POST /api/auth/login
-
-- **Tag:** Auth
-- **Descrição:** Autenticar usuário e obter tokens JWT
-- **Body:** `{ email, password }`
-- **Respostas:**
-  - `200`: Retorna accessToken, refreshToken e dados do usuário
-  - `401`: Credenciais inválidas
-
-#### GET /api/health
-
-- **Tag:** Health
-- **Descrição:** Health check da API
-- **Respostas:**
-  - `200`: API funcionando corretamente
-
-> Toda rota possui schema OpenAPI completo com validação automática via Fastify + Swagger.
-
 ## Diretrizes para o Copilot
 
 Ao trabalhar neste projeto:
@@ -211,3 +178,9 @@ Ao trabalhar neste projeto:
 7. **Performance é crítica**: O usuário não pode esperar muito para abrir/fechar navegadores
 8. **Documentação clara**: Documente rotas, decisões técnicas e trade-offs
 9. **TypeScript strict**: Mantenha tipagem forte em todo o código
+
+## Commits
+
+- Use mensagens de commit claras e descritivas
+- Siga o padrão Conventional Commits (feat, fix, docs, style, refactor, test, chore)
+- Faça commits pequenos e focados
