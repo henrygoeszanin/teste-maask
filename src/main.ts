@@ -51,6 +51,36 @@ app.register(swagger, {
       },
     },
   },
+  transform: ({ schema, url }) => {
+    // Adiciona exemplos aos schemas se existirem
+    const transformedSchema = { ...schema };
+
+    if (schema.body && (schema.body as any)._examples) {
+      transformedSchema.body = {
+        ...schema.body,
+        examples: (schema.body as any)._examples,
+      };
+    }
+
+    if (schema.response) {
+      const transformedResponse: any = {};
+      for (const [statusCode, responseSchema] of Object.entries(
+        schema.response
+      )) {
+        if ((responseSchema as any)._examples) {
+          transformedResponse[statusCode] = {
+            ...responseSchema,
+            examples: (responseSchema as any)._examples,
+          };
+        } else {
+          transformedResponse[statusCode] = responseSchema;
+        }
+      }
+      transformedSchema.response = transformedResponse;
+    }
+
+    return { schema: transformedSchema, url };
+  },
 });
 
 app.register(swaggerUI, {

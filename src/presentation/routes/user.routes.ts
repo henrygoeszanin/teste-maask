@@ -5,6 +5,21 @@ import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { RegisterUseCase } from "@/application/usecases/RegisterUseCase";
 import { UpdateUserUseCase } from "@/application/usecases/UpdateUserUseCase";
 import { authenticate } from "../middlewares/authenticate";
+import { z } from "zod";
+import {
+  RegisterSchema,
+  UpdateUserSchema,
+  UserResponseSchema,
+  UserMeResponseSchema,
+  ErrorResponseSchema,
+} from "@application/dtos/user.dto";
+
+// Helper para adicionar exemplos aos schemas Zod
+function withExamples<T extends z.ZodType<any>>(zodSchema: T, examples: any[]) {
+  const schemaWithExamples = zodSchema as T & { _examples?: any[] };
+  (schemaWithExamples as any)._examples = examples;
+  return schemaWithExamples;
+}
 
 export async function userRoutes(app: FastifyInstance) {
   const userRepository = new UserRepository();
@@ -19,37 +34,16 @@ export async function userRoutes(app: FastifyInstance) {
       schema: {
         tags: ["Users"],
         description: "Criar um novo usuário",
-        body: {
-          type: "object",
-          properties: {
-            name: { type: "string" },
-            email: { type: "string", format: "email" },
-            password: { type: "string", minLength: 8 },
-          },
-          required: ["name", "email", "password"],
-          example: {
+        body: withExamples(RegisterSchema, [
+          {
             name: "João da Silva",
             email: "joao@email.com",
             password: "Senha123!",
           },
-        },
+        ]),
         response: {
-          201: {
-            type: "object",
-            properties: {
-              message: { type: "string" },
-              data: {
-                type: "object",
-                properties: {
-                  id: { type: "string" },
-                  name: { type: "string" },
-                  email: { type: "string", format: "email" },
-                  createdAt: { type: "string", format: "date-time" },
-                  updatedAt: { type: "string", format: "date-time" },
-                },
-              },
-            },
-            example: {
+          201: withExamples(UserResponseSchema, [
+            {
               message: "Usuário criado com sucesso",
               data: {
                 id: "uuid-123",
@@ -59,14 +53,10 @@ export async function userRoutes(app: FastifyInstance) {
                 updatedAt: "2025-10-13T12:00:00.000Z",
               },
             },
-          },
-          409: {
-            type: "object",
-            properties: {
-              error: { type: "string" },
-            },
-            example: { error: "Email already registered" },
-          },
+          ]),
+          409: withExamples(ErrorResponseSchema, [
+            { error: "Email already registered" },
+          ]),
         },
       },
     },
@@ -82,35 +72,15 @@ export async function userRoutes(app: FastifyInstance) {
         tags: ["Users"],
         description:
           "Atualizar dados do usuário autenticado (requer Bearer token)",
-        body: {
-          type: "object",
-          properties: {
-            name: { type: "string" },
-            email: { type: "string", format: "email" },
-            password: { type: "string", minLength: 8 },
-          },
-          example: {
+        body: withExamples(UpdateUserSchema, [
+          {
             name: "Novo Nome",
             email: "novo@email.com",
           },
-        },
+        ]),
         response: {
-          200: {
-            type: "object",
-            properties: {
-              message: { type: "string" },
-              data: {
-                type: "object",
-                properties: {
-                  id: { type: "string" },
-                  name: { type: "string" },
-                  email: { type: "string", format: "email" },
-                  createdAt: { type: "string", format: "date-time" },
-                  updatedAt: { type: "string", format: "date-time" },
-                },
-              },
-            },
-            example: {
+          200: withExamples(UserResponseSchema, [
+            {
               message: "Usuário atualizado com sucesso",
               data: {
                 id: "uuid-123",
@@ -120,29 +90,16 @@ export async function userRoutes(app: FastifyInstance) {
                 updatedAt: "2025-10-13T12:10:00.000Z",
               },
             },
-          },
-          401: {
-            type: "object",
-            properties: {
-              error: { type: "string" },
-            },
-            example: { error: "Token not provided" },
-          },
-          404: {
-            type: "object",
-            properties: {
-              error: { type: "string" },
-            },
-            example: { error: "User not found" },
-          },
-          409: {
-            type: "object",
-            properties: {
-              error: { type: "string" },
-            },
-            example: { error: "This email is already in use" },
-          },
+          ]),
+          401: withExamples(ErrorResponseSchema, [
+            { error: "Token not provided" },
+          ]),
+          404: withExamples(ErrorResponseSchema, [{ error: "User not found" }]),
+          409: withExamples(ErrorResponseSchema, [
+            { error: "This email is already in use" },
+          ]),
         },
+        security: [{ bearerAuth: [] }],
       },
     },
     userController.updateMe.bind(userController)
@@ -158,33 +115,18 @@ export async function userRoutes(app: FastifyInstance) {
         description:
           "Buscar dados do usuário autenticado (requer Bearer token)",
         response: {
-          200: {
-            type: "object",
-            properties: {
-              data: {
-                type: "object",
-                properties: {
-                  id: { type: "string" },
-                  name: { type: "string" },
-                  email: { type: "string", format: "email" },
-                },
-              },
-            },
-            example: {
+          200: withExamples(UserMeResponseSchema, [
+            {
               data: {
                 id: "uuid-123",
                 name: "João da Silva",
                 email: "joao@email.com",
               },
             },
-          },
-          401: {
-            type: "object",
-            properties: {
-              error: { type: "string" },
-            },
-            example: { error: "Token not provided" },
-          },
+          ]),
+          401: withExamples(ErrorResponseSchema, [
+            { error: "Token not provided" },
+          ]),
         },
         security: [{ bearerAuth: [] }],
       },

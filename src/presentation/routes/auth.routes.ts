@@ -1,6 +1,24 @@
 import { FastifyInstance } from "fastify";
 import { AuthController } from "../controllers/AuthController";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
+import { z } from "zod";
+import {
+  LoginSchema,
+  LoginResponseSchema,
+  AuthErrorResponseSchema,
+} from "@application/dtos/auth.dto";
+import {
+  RefreshTokenSchema,
+  RefreshTokenResponseSchema,
+  RefreshTokenErrorResponseSchema,
+} from "@application/dtos/refresh.dto";
+
+// Helper para adicionar exemplos aos schemas Zod
+function withExamples<T extends z.ZodType<any>>(zodSchema: T, examples: any[]) {
+  const schemaWithExamples = zodSchema as T & { _examples?: any[] };
+  (schemaWithExamples as any)._examples = examples;
+  return schemaWithExamples;
+}
 
 export async function authRoutes(app: FastifyInstance) {
   const authController = new AuthController();
@@ -11,42 +29,15 @@ export async function authRoutes(app: FastifyInstance) {
       schema: {
         tags: ["Auth"],
         description: "Autenticar usuário e obter tokens JWT",
-        body: {
-          type: "object",
-          properties: {
-            email: { type: "string", format: "email" },
-            password: { type: "string", minLength: 8 },
-          },
-          required: ["email", "password"],
-          example: {
+        body: withExamples(LoginSchema, [
+          {
             email: "usuario@email.com",
             password: "Senha123!",
           },
-        },
+        ]),
         response: {
-          200: {
-            type: "object",
-            properties: {
-              accessToken: { type: "string" },
-              refreshToken: { type: "string" },
-              expiresIn: {
-                type: "number",
-                description: "Tempo de expiração do accessToken em segundos",
-              },
-              refreshExpiresIn: {
-                type: "number",
-                description: "Tempo de expiração do refreshToken em segundos",
-              },
-              user: {
-                type: "object",
-                properties: {
-                  id: { type: "string" },
-                  name: { type: "string" },
-                  email: { type: "string", format: "email" },
-                },
-              },
-            },
-            example: {
+          200: withExamples(LoginResponseSchema, [
+            {
               accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
               refreshToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
               expiresIn: 3600,
@@ -57,14 +48,10 @@ export async function authRoutes(app: FastifyInstance) {
                 email: "usuario@email.com",
               },
             },
-          },
-          401: {
-            type: "object",
-            properties: {
-              error: { type: "string" },
-            },
-            example: { error: "Invalid username or password" },
-          },
+          ]),
+          401: withExamples(AuthErrorResponseSchema, [
+            { error: "Invalid username or password" },
+          ]),
         },
       },
     },
@@ -77,38 +64,21 @@ export async function authRoutes(app: FastifyInstance) {
       schema: {
         tags: ["Auth"],
         description: "Gerar novo accessToken a partir do refreshToken",
-        body: {
-          type: "object",
-          properties: {
-            refreshToken: { type: "string" },
-          },
-          required: ["refreshToken"],
-          example: {
+        body: withExamples(RefreshTokenSchema, [
+          {
             refreshToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
           },
-        },
+        ]),
         response: {
-          200: {
-            type: "object",
-            properties: {
-              accessToken: { type: "string" },
-              expiresIn: {
-                type: "number",
-                description: "Tempo de expiração do accessToken em segundos",
-              },
-            },
-            example: {
+          200: withExamples(RefreshTokenResponseSchema, [
+            {
               accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
               expiresIn: 3600,
             },
-          },
-          401: {
-            type: "object",
-            properties: {
-              error: { type: "string" },
-            },
-            example: { error: "Invalid or expired refresh token" },
-          },
+          ]),
+          401: withExamples(RefreshTokenErrorResponseSchema, [
+            { error: "Invalid or expired refresh token" },
+          ]),
         },
       },
     },
