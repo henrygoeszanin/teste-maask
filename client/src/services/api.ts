@@ -2,15 +2,26 @@
  * Serviço de API para comunicação com o backend
  */
 
-import { getAccessToken, getDeviceId } from "../utils/storage";
+import {
+  getAccessToken,
+  getDeviceId,
+  getRefreshToken,
+  saveTokens,
+  clearAuth,
+} from "../utils/storage";
 
 const API_BASE_URL = "http://localhost:3000/api";
+
+// Flag para evitar múltiplas tentativas de refresh simultâneas
+let isRefreshing = false;
+let refreshPromise: Promise<string> | null = null;
 
 // ==================== HELPER ====================
 
 async function fetchAPI<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  isRetry = false
 ): Promise<T> {
   const token = getAccessToken();
   const deviceId = getDeviceId();
@@ -34,6 +45,20 @@ async function fetchAPI<T>(
     headers,
   });
 
+  // Se receber 401 e não for uma retry, tenta refresh
+  if (response.status === 401 && !isRetry && !endpoint.includes("/auth")) {
+    try {
+      await refreshAccessToken();
+      // Tenta novamente com o novo token
+      return fetchAPI<T>(endpoint, options, true);
+    } catch {
+      // Se refresh falhar, limpa autenticação e força login
+      clearAuth();
+      window.location.href = "/";
+      throw new Error("Sessão expirada. Faça login novamente.");
+    }
+  }
+
   if (!response.ok) {
     const error = await response
       .json()
@@ -42,6 +67,47 @@ async function fetchAPI<T>(
   }
 
   return await response.json();
+}
+
+/**
+ * Renova o access token usando o refresh token
+ */
+async function refreshAccessToken(): Promise<string> {
+  // Se já estiver renovando, aguarda a promise existente
+  if (isRefreshing && refreshPromise) {
+    return refreshPromise;
+  }
+
+  isRefreshing = true;
+  refreshPromise = (async () => {
+    try {
+      const refreshToken = getRefreshToken();
+      if (!refreshToken) {
+        throw new Error("No refresh token available");
+      }
+
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to refresh token");
+      }
+
+      const data = await response.json();
+      saveTokens(data.accessToken, data.refreshToken);
+      return data.accessToken;
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
 }
 
 // ==================== AUTH ====================

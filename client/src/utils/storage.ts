@@ -111,6 +111,11 @@ export function clearAllStorage() {
   clearMDKFromMemory();
 }
 
+// Alias para clearAllStorage (para compatibilidade)
+export function clearAuth() {
+  clearAllStorage();
+}
+
 // ==================== CHECK AUTH ====================
 
 export function isAuthenticated(): boolean {

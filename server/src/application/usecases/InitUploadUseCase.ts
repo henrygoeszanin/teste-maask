@@ -28,11 +28,11 @@ export class InitUploadUseCase {
     const storageKey = this.s3Service.generateFileKey(input.userId, fileId);
 
     // Gera presigned URL para upload (válida por 1 hora)
+    // Não passamos mimeType para evitar preflight CORS
     const expiresIn = 3600; // 1 hora
     const presignedUrl = await this.s3Service.generatePresignedUploadUrl(
       storageKey,
-      expiresIn,
-      input.mimeType
+      expiresIn
     );
 
     return {

@@ -101,7 +101,7 @@ export default function DeviceManager() {
 
     try {
       setMessage(`🚫 Revogando dispositivo ${device.deviceId.substring(0, 8)}...`);
-      await revokeDevice(device.deviceId, password, 'Revogado manualmente pelo usuário');
+      await revokeDevice(device.deviceId, password, 'user_initiated');
 
       setMessage(`✅ Dispositivo ${device.deviceId.substring(0, 8)} revogado com sucesso!`);
       await loadDevices();

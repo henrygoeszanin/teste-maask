@@ -100,11 +100,9 @@ app.setErrorHandler((error, request, reply) => {
 
   request.log.error(error);
 
+  // Retorna formato compatível com os schemas de erro
   reply.status(statusCode).send({
-    error: {
-      message,
-      statusCode,
-    },
+    error: message,
   });
 });
 
@@ -114,23 +112,6 @@ registerRoutes(app);
 // Start server
 const start = async () => {
   try {
-    // Configurar CORS no S3 (apenas em desenvolvimento)
-    if (config.server.env === "development") {
-      try {
-        const { S3Service } = await import(
-          "./infrastructure/external/S3Service.js"
-        );
-        const s3Service = new S3Service();
-        await s3Service.configureBucketCors([
-          "http://localhost:5173",
-          "http://localhost:3000",
-        ]);
-        console.log("✅ S3 CORS configured for development");
-      } catch (error) {
-        console.warn("⚠️  Failed to configure S3 CORS (non-blocking):", error);
-      }
-    }
-
     await app.listen({
       port: config.server.port,
       host: config.server.host,
