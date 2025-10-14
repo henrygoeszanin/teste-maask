@@ -2,14 +2,13 @@ import { z } from "zod";
 
 export const UpdateUserSchema = z.object({
   name: z.string().optional().describe("Nome do usuário"),
-  email: z.string().email().optional().describe("E-mail do usuário"),
 });
 
 export type UpdateUserDTO = z.infer<typeof UpdateUserSchema>;
 
 export const RegisterSchema = z.object({
   name: z.string().min(2).max(100).describe("Nome completo do usuário"),
-  email: z.string().email().describe("E-mail do usuário"),
+  email: z.email().describe("E-mail do usuário"),
   password: z
     .string()
     .min(8)
@@ -29,7 +28,7 @@ export type RegisterDTO = z.infer<typeof RegisterSchema>;
 const UserDataSchema = z.object({
   id: z.string(),
   name: z.string(),
-  email: z.string().email(),
+  email: z.email(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

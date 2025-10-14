@@ -13,14 +13,6 @@ export class UpdateUserUseCase {
       throw new NotFoundError("Usuário não encontrado");
     }
 
-    // Se o email está sendo atualizado, verifica se já existe outro usuário com esse email
-    if (data.email && data.email !== user.email) {
-      const existingUser = await this.userRepo.findByEmail(data.email);
-      if (existingUser && existingUser.id !== userId) {
-        throw new UserAlreadyExistsError("Este e-mail já está em uso");
-      }
-    }
-
     // Atualiza apenas os campos fornecidos
     const updateData: Partial<typeof user> = {
       updatedAt: new Date(),
@@ -28,10 +20,6 @@ export class UpdateUserUseCase {
 
     if (data.name !== undefined) {
       updateData.name = data.name;
-    }
-
-    if (data.email !== undefined) {
-      updateData.email = data.email;
     }
 
     return await this.userRepo.update(userId, updateData);
