@@ -24,11 +24,8 @@ async function fetchAPI<T>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  if (
-    deviceId &&
-    !endpoint.includes("/devices") &&
-    !endpoint.includes("/envelopes")
-  ) {
+  // Envia X-Device-Id para todos os endpoints, exceto /devices (para evitar conflito no registro)
+  if (deviceId && !endpoint.includes("/devices")) {
     headers["X-Device-Id"] = deviceId;
   }
 
@@ -144,10 +141,8 @@ export async function registerDevice(
 }
 
 export interface ListDevicesResponse {
-  data: {
-    devices: Device[];
-    total: number;
-  };
+  devices: Device[];
+  total?: number;
 }
 
 export async function listDevices(): Promise<ListDevicesResponse> {
@@ -164,15 +159,20 @@ export async function getDevice(deviceId: string): Promise<GetDeviceResponse> {
 
 export interface RevokeDeviceResponse {
   message: string;
+  data: {
+    deviceId: string;
+    revokedAt: string;
+  };
 }
 
 export async function revokeDevice(
   deviceId: string,
+  password: string,
   reason: string
 ): Promise<RevokeDeviceResponse> {
-  return fetchAPI<RevokeDeviceResponse>(`/devices/${deviceId}/revoke`, {
+  return fetchAPI<RevokeDeviceResponse>(`/devices/revoke`, {
     method: "POST",
-    body: JSON.stringify({ reason }),
+    body: JSON.stringify({ deviceId, password, reason }),
   });
 }
 
@@ -257,10 +257,12 @@ export interface InitUploadRequest {
 }
 
 export interface InitUploadResponse {
-  uploadId: string;
-  fileId: string;
-  presignedUrl: string;
-  expiresIn: number;
+  data: {
+    uploadId: string;
+    fileId: string;
+    presignedUrl: string;
+    expiresIn: number;
+  };
 }
 
 export async function initUpload(

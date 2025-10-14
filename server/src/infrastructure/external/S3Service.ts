@@ -4,6 +4,7 @@ import {
   GetObjectCommand,
   DeleteObjectCommand,
   HeadObjectCommand,
+  PutBucketCorsCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { config } from "@config/index";
@@ -178,5 +179,34 @@ export class S3Service {
    */
   generateFileKey(userId: string, fileId: string): string {
     return `users/${userId}/files/${fileId}`;
+  }
+
+  /**
+   * Configura CORS no bucket S3 para permitir uploads diretos do front-end
+   * Deve ser executado uma vez durante a configuração inicial
+   */
+  async configureBucketCors(
+    allowedOrigins: string[] = ["http://localhost:5173"]
+  ): Promise<void> {
+    const command = new PutBucketCorsCommand({
+      Bucket: this.bucket,
+      CORSConfiguration: {
+        CORSRules: [
+          {
+            AllowedHeaders: ["*"],
+            AllowedMethods: ["GET", "PUT", "POST", "DELETE", "HEAD"],
+            AllowedOrigins: allowedOrigins,
+            ExposeHeaders: [
+              "ETag",
+              "x-amz-server-side-encryption",
+              "x-amz-request-id",
+            ],
+            MaxAgeSeconds: 3600,
+          },
+        ],
+      },
+    });
+
+    await this.client.send(command);
   }
 }

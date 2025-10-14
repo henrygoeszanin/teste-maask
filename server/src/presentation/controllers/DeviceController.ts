@@ -52,6 +52,42 @@ export class DeviceController {
   }
 
   /**
+   * Busca um dispositivo específico por ID
+   */
+  static async getById(request: FastifyRequest, reply: FastifyReply) {
+    const userId = request.user?.id!;
+    const { id } = request.params as { id: string };
+
+    const deviceRepository = new DeviceRepository();
+    const device = await deviceRepository.findById(id);
+
+    if (!device) {
+      return reply.status(404).send({
+        error: "Device not found",
+      });
+    }
+
+    // Verifica se pertence ao usuário
+    if (device.userId !== userId) {
+      return reply.status(403).send({
+        error: "You do not have permission to access this device",
+      });
+    }
+
+    return reply.send({
+      data: {
+        id: device.id,
+        deviceId: device.deviceId,
+        publicKey: device.publicKey,
+        publicKeyFormat: device.publicKeyFormat,
+        keyFingerprint: device.keyFingerprint,
+        status: device.status,
+        createdAt: device.createdAt.toISOString(),
+      },
+    });
+  }
+
+  /**
    * Revoga (desativa) um dispositivo
    */
   static async revoke(request: FastifyRequest, reply: FastifyReply) {

@@ -94,6 +94,46 @@ export async function deviceRoutes(app: FastifyInstance) {
     DeviceController.list
   );
 
+  // Buscar dispositivo específico por ID
+  app.withTypeProvider<ZodTypeProvider>().get(
+    "/devices/:id",
+    {
+      preHandler: authenticate,
+      schema: {
+        tags: ["Devices"],
+        description:
+          "Busca um dispositivo específico por ID (requer Bearer token)",
+        params: z.object({
+          id: z.string().min(1, "Device ID is required"),
+        }),
+        response: {
+          200: z.object({
+            data: z.object({
+              id: z.string(),
+              deviceId: z.string(),
+              publicKey: z.string(),
+              publicKeyFormat: z.string(),
+              keyFingerprint: z.string(),
+              status: z.string(),
+              createdAt: z.string(),
+            }),
+          }),
+          404: withExamples(DeviceErrorResponseSchema, [
+            { error: "Device not found" },
+          ]),
+          403: withExamples(DeviceErrorResponseSchema, [
+            { error: "You do not have permission to access this device" },
+          ]),
+          401: withExamples(DeviceErrorResponseSchema, [
+            { error: "Token not provided" },
+          ]),
+        },
+        security: [{ bearerAuth: [] }],
+      },
+    },
+    DeviceController.getById
+  );
+
   // ⚠️ Revogar dispositivo com segurança reforçada (requer senha)
   app.withTypeProvider<ZodTypeProvider>().post(
     "/devices/revoke",

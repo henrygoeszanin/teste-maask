@@ -10,8 +10,8 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "outDir": "./dist",
-    "rootDir": "server/src",
-    "baseUrl": "server/src",
+    "rootDir": "./src",
+    "baseUrl": "./src",
     "paths": {
       "@/*": ["./*"],
       "@application/*": ["application/*"],
@@ -22,6 +22,6 @@
     },
     "ignoreDeprecations": "5.0"
   },
-  "include": ["server/src/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

@@ -28,7 +28,7 @@ export default function DeviceManager() {
   const loadDevices = async () => {
     try {
       const response = await listDevices();
-      setDevices(response.data.devices);
+      setDevices(response.devices);
     } catch (error) {
       console.error('Erro ao carregar dispositivos:', error);
     }
@@ -85,7 +85,13 @@ export default function DeviceManager() {
   };
 
   const handleRevoke = async (device: Device) => {
-    if (!confirm(`Tem certeza que deseja revogar o dispositivo ${device.deviceId.substring(0, 8)}?`)) {
+    if (!confirm(`⚠️ Tem certeza que deseja revogar o dispositivo ${device.deviceId.substring(0, 8)}?\n\nEsta ação requer sua senha e não pode ser desfeita.`)) {
+      return;
+    }
+
+    const password = prompt('🔒 Digite sua senha para confirmar a revogação:');
+    if (!password) {
+      setMessage('❌ Revogação cancelada - senha não fornecida');
       return;
     }
 
@@ -95,7 +101,7 @@ export default function DeviceManager() {
 
     try {
       setMessage(`🚫 Revogando dispositivo ${device.deviceId.substring(0, 8)}...`);
-      await revokeDevice(device.id, 'Revogado manualmente pelo usuário');
+      await revokeDevice(device.deviceId, password, 'Revogado manualmente pelo usuário');
 
       setMessage(`✅ Dispositivo ${device.deviceId.substring(0, 8)} revogado com sucesso!`);
       await loadDevices();

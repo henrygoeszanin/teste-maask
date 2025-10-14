@@ -80,12 +80,10 @@ export default function FileManager() {
 
       // Passo 4: Upload para S3
       setMessage('☁️ Enviando arquivo criptografado para armazenamento...');
-      const uploadResponse = await fetch(initResponse.presignedUrl, {
+      const uploadResponse = await fetch(initResponse.data.presignedUrl, {
         method: 'PUT',
         body: ciphertext,
-        headers: {
-          'Content-Type': 'application/octet-stream',
-        },
+        // Removendo headers para evitar preflight CORS
       });
 
       if (!uploadResponse.ok) {
@@ -108,7 +106,7 @@ export default function FileManager() {
       // Passo 6: Completar upload
       setMessage('✔️ Finalizando upload...');
       await completeUpload({
-        uploadId: initResponse.uploadId,
+        uploadId: initResponse.data.uploadId,
         encryptedFek: arrayBufferToBase64(encryptedFek),
         encryptionMetadata: {
           algorithm: 'AES-256-GCM',
