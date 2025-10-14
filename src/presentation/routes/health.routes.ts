@@ -1,6 +1,9 @@
 import { FastifyInstance } from "fastify";
 import { HealthController } from "../controllers/HealthController";
-import { HealthResponseSchema } from "@/application/dtos/health.dto";
+import {
+  HealthResponseSchema,
+  HealthFullResponseSchema,
+} from "@/application/dtos/health.dto";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 
 export async function healthRoutes(app: FastifyInstance) {
@@ -11,9 +14,10 @@ export async function healthRoutes(app: FastifyInstance) {
     {
       schema: {
         tags: ["Health"],
-        description: "Health check da API",
+        description:
+          "Health check da API (inclui status e latência do banco de dados)",
         response: {
-          200: HealthResponseSchema,
+          200: HealthFullResponseSchema,
         },
       },
     },

@@ -3,6 +3,7 @@ import { config } from "@config/index";
 import { registerRoutes } from "@presentation/routes";
 import swagger from "@fastify/swagger";
 import swaggerUI from "@fastify/swagger-ui";
+import cors from "@fastify/cors";
 import {
   serializerCompiler,
   validatorCompiler,
@@ -18,6 +19,13 @@ const app = Fastify({
 // Set validator and serializer
 app.setValidatorCompiler(validatorCompiler);
 app.setSerializerCompiler(serializerCompiler);
+
+// CORS configuration
+app.register(cors, {
+  origin: config.server.env === "development" ? "*" : false,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+});
 
 // Swagger/OpenAPI configuration
 app.register(swagger, {
