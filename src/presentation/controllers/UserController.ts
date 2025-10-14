@@ -50,4 +50,12 @@ export class UserController {
       return reply.status(500).send({ error: "Erro interno do servidor" });
     }
   }
+
+  async me(request: FastifyRequest, reply: FastifyReply) {
+    // O middleware de autenticação garante que request.user existe
+    const user = request.user;
+    return reply.status(200).send({
+      data: user,
+    });
+  }
 }
