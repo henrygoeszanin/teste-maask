@@ -18,7 +18,8 @@ export class File {
     public sizeBytes: number,
     public storagePath: string,
     public encryptedFek: string,
-    public encryptionMetadata: EncryptionMetadata,
+    public fekEncryptionMetadata: EncryptionMetadata, // Metadados da criptografia da FEK (FEK foi criptografada com MDK)
+    public fileEncryptionMetadata: EncryptionMetadata, // Metadados da criptografia do arquivo (arquivo foi criptografado com FEK)
     public createdAt: Date,
     public updatedAt: Date
   ) {}
@@ -29,7 +30,8 @@ export class File {
     sizeBytes: number,
     storagePath: string,
     encryptedFek: string,
-    encryptionMetadata: EncryptionMetadata
+    fekEncryptionMetadata: EncryptionMetadata,
+    fileEncryptionMetadata: EncryptionMetadata
   ): File {
     return new File(
       ulid(), // id
@@ -39,7 +41,8 @@ export class File {
       sizeBytes,
       storagePath,
       encryptedFek,
-      encryptionMetadata,
+      fekEncryptionMetadata,
+      fileEncryptionMetadata,
       new Date(), // createdAt
       new Date() // updatedAt
     );

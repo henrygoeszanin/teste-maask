@@ -74,7 +74,7 @@ export default function DeviceSetup({ onSetupComplete }: DeviceSetupProps) {
         
         setMessage('✅ MDK recuperada do envelope existente!');
         setStep(6);
-      } catch (error) {
+      } catch {
         // Envelope não existe - criar novo
         setMessage('🔐 Gerando nova MDK (primeira vez)...');
         mdk = await generateMDK();
@@ -140,7 +140,14 @@ export default function DeviceSetup({ onSetupComplete }: DeviceSetupProps) {
       setTimeout(() => onSetupComplete(), 1000);
 
     } catch (error) {
-      setMessage(`❌ Erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      
+      // Tratamento específico para MDK não encontrada
+      if (errorMessage.includes('MDK not found') || errorMessage.includes('404')) {
+        setMessage(`❌ MDK não encontrada neste dispositivo. Por favor, faça o setup completo clicando em "Configurar Dispositivo" ou sincronize a MDK de outro dispositivo autorizado.`);
+      } else {
+        setMessage(`❌ Erro: ${errorMessage}`);
+      }
     } finally {
       setLoading(false);
     }

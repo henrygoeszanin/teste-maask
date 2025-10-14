@@ -56,7 +56,8 @@ export const files = pgTable("files", {
   sizeBytes: integer("size_bytes").notNull(),
   storagePath: text("storage_path").notNull(),
   encryptedFek: text("encrypted_fek").notNull(),
-  encryptionMetadata: jsonb("encryption_metadata").notNull(),
+  fekEncryptionMetadata: jsonb("fek_encryption_metadata").notNull(), // Metadados da criptografia da FEK
+  fileEncryptionMetadata: jsonb("file_encryption_metadata").notNull(), // Metadados da criptografia do arquivo
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

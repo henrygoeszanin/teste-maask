@@ -41,19 +41,33 @@ export const CompleteUploadSchema = z.object({
     .string()
     .min(1, "encryptedFek é obrigatório")
     .describe("FEK criptografada pela MDK em base64"),
-  encryptionMetadata: z.object({
+  fekEncryptionMetadata: z.object({
     algorithm: z
       .string()
       .default("AES-256-GCM")
-      .describe("Algoritmo de criptografia simétrica"),
+      .describe("Algoritmo usado para criptografar a FEK"),
     iv: z
       .string()
       .min(1, "iv é obrigatório")
-      .describe("Initialization Vector em base64"),
+      .describe("IV usado para criptografar a FEK em base64"),
     authTag: z
       .string()
       .min(1, "authTag é obrigatório")
-      .describe("Authentication Tag do AES-GCM em base64"),
+      .describe("AuthTag da criptografia da FEK em base64"),
+  }),
+  fileEncryptionMetadata: z.object({
+    algorithm: z
+      .string()
+      .default("AES-256-GCM")
+      .describe("Algoritmo usado para criptografar o arquivo"),
+    iv: z
+      .string()
+      .min(1, "iv é obrigatório")
+      .describe("IV usado para criptografar o arquivo em base64"),
+    authTag: z
+      .string()
+      .min(1, "authTag é obrigatório")
+      .describe("AuthTag da criptografia do arquivo em base64"),
   }),
 });
 
@@ -81,7 +95,12 @@ export const DownloadFileResponseSchema = z.object({
     fileName: z.string(),
     presignedUrl: z.string(),
     encryptedFek: z.string(),
-    encryptionMetadata: z.object({
+    fekEncryptionMetadata: z.object({
+      algorithm: z.string(),
+      iv: z.string(),
+      authTag: z.string(),
+    }),
+    fileEncryptionMetadata: z.object({
       algorithm: z.string(),
       iv: z.string(),
       authTag: z.string(),

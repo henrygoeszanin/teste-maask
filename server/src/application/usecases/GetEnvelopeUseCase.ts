@@ -43,7 +43,10 @@ export class GetEnvelopeUseCase {
     );
 
     if (!envelope) {
-      throw new NotFoundError("Envelope não encontrado para este dispositivo");
+      throw new AppError(
+        "MDK not found for this device. Please set up this device first or sync from another device.",
+        404
+      );
     }
 
     return envelope;

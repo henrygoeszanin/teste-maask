@@ -53,7 +53,8 @@ export class FileController {
       fileName,
       fileSize,
       encryptedFek,
-      encryptionMetadata,
+      fekEncryptionMetadata,
+      fileEncryptionMetadata,
     } = request.body as CompleteUploadDTO;
 
     const fileRepository = new FileRepository();
@@ -70,7 +71,8 @@ export class FileController {
       fileName,
       fileSize,
       encryptedFek,
-      encryptionMetadata,
+      fekEncryptionMetadata,
+      fileEncryptionMetadata,
     });
 
     return reply.status(200).send({

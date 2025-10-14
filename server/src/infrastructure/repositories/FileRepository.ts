@@ -16,7 +16,8 @@ export class FileRepository implements IFileRepository {
         sizeBytes: file.sizeBytes,
         storagePath: file.storagePath,
         encryptedFek: file.encryptedFek,
-        encryptionMetadata: file.encryptionMetadata,
+        fekEncryptionMetadata: file.fekEncryptionMetadata,
+        fileEncryptionMetadata: file.fileEncryptionMetadata,
         createdAt: file.createdAt,
         updatedAt: file.updatedAt,
       })
@@ -81,7 +82,8 @@ export class FileRepository implements IFileRepository {
         sizeBytes: file.sizeBytes,
         storagePath: file.storagePath,
         encryptedFek: file.encryptedFek,
-        encryptionMetadata: file.encryptionMetadata,
+        fekEncryptionMetadata: file.fekEncryptionMetadata,
+        fileEncryptionMetadata: file.fileEncryptionMetadata,
         updatedAt: file.updatedAt,
       })
       .where(eq(files.id, file.id))
@@ -103,7 +105,8 @@ export class FileRepository implements IFileRepository {
       row.sizeBytes,
       row.storagePath,
       row.encryptedFek,
-      row.encryptionMetadata as EncryptionMetadata,
+      row.fekEncryptionMetadata as EncryptionMetadata,
+      row.fileEncryptionMetadata as EncryptionMetadata,
       row.createdAt,
       row.updatedAt
     );

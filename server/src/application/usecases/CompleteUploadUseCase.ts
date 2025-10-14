@@ -10,7 +10,8 @@ export interface CompleteUploadInput {
   fileName: string;
   fileSize: number;
   encryptedFek: string;
-  encryptionMetadata: EncryptionMetadata;
+  fekEncryptionMetadata: EncryptionMetadata;
+  fileEncryptionMetadata: EncryptionMetadata;
 }
 
 export interface CompleteUploadOutput {
@@ -57,7 +58,8 @@ export class CompleteUploadUseCase {
       input.fileSize,
       storagePath,
       input.encryptedFek,
-      input.encryptionMetadata
+      input.fekEncryptionMetadata,
+      input.fileEncryptionMetadata
     );
 
     // Sobrescreve o fileId gerado pelo create com o fornecido

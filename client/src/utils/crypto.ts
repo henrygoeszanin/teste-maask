@@ -245,20 +245,41 @@ export async function decryptWithAES(
   iv: Uint8Array,
   authTag: Uint8Array
 ): Promise<ArrayBuffer> {
+  console.log("[Crypto] decryptWithAES:", {
+    ciphertextSize: ciphertext.byteLength,
+    ivSize: iv.byteLength,
+    authTagSize: authTag.byteLength,
+    keyType: key.type,
+    keyAlgorithm: key.algorithm,
+  });
+
   // Concatena ciphertext + authTag para o decrypt
   const combined = new Uint8Array(ciphertext.byteLength + authTag.byteLength);
   combined.set(new Uint8Array(ciphertext), 0);
   combined.set(authTag, ciphertext.byteLength);
 
-  return await crypto.subtle.decrypt(
-    {
-      name: "AES-GCM",
-      iv: iv as BufferSource,
-      tagLength: 128,
-    },
-    key,
-    combined
-  );
+  try {
+    const decrypted = await crypto.subtle.decrypt(
+      {
+        name: "AES-GCM",
+        iv: iv as BufferSource,
+        tagLength: 128,
+      },
+      key,
+      combined
+    );
+    console.log(
+      "[Crypto] Descriptografia bem-sucedida, tamanho:",
+      decrypted.byteLength
+    );
+    return decrypted;
+  } catch (error) {
+    console.error("[Crypto] Falha na descriptografia AES-GCM:", error);
+    console.error(
+      "[Crypto] Possível causa: chave incorreta ou dados corrompidos"
+    );
+    throw error;
+  }
 }
 
 // ==================== UTILITÁRIOS ====================

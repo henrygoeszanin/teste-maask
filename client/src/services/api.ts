@@ -40,19 +40,24 @@ async function fetchAPI<T>(
     headers["X-Device-Id"] = deviceId;
   }
 
+  console.log("[API] Request:", endpoint, options);
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers,
   });
 
-  // Se receber 401 e não for uma retry, tenta refresh
   if (response.status === 401 && !isRetry && !endpoint.includes("/auth")) {
+    console.warn(
+      "[API] 401 recebido em",
+      endpoint,
+      "- tentando refresh token..."
+    );
     try {
       await refreshAccessToken();
-      // Tenta novamente com o novo token
+      console.log("[API] Token renovado, refazendo request:", endpoint);
       return fetchAPI<T>(endpoint, options, true);
-    } catch {
-      // Se refresh falhar, limpa autenticação e força login
+    } catch (err) {
+      console.error("[API] Falha ao renovar token:", err);
       clearAuth();
       window.location.href = "/";
       throw new Error("Sessão expirada. Faça login novamente.");
@@ -75,6 +80,7 @@ async function fetchAPI<T>(
 async function refreshAccessToken(): Promise<string> {
   // Se já estiver renovando, aguarda a promise existente
   if (isRefreshing && refreshPromise) {
+    console.log("[API] Já está renovando token, aguardando...");
     return refreshPromise;
   }
 
@@ -86,6 +92,7 @@ async function refreshAccessToken(): Promise<string> {
         throw new Error("No refresh token available");
       }
 
+      console.log("[API] Fazendo request de refresh token...");
       const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
         method: "POST",
         headers: {
@@ -95,11 +102,14 @@ async function refreshAccessToken(): Promise<string> {
       });
 
       if (!response.ok) {
+        const text = await response.text();
+        console.error("[API] Falha no refresh token:", response.status, text);
         throw new Error("Failed to refresh token");
       }
 
       const data = await response.json();
       saveTokens(data.accessToken, data.refreshToken);
+      console.log("[API] Tokens salvos após refresh");
       return data.accessToken;
     } finally {
       isRefreshing = false;
@@ -285,33 +295,15 @@ export interface GetEnvelopeResponse {
 }
 
 export async function getMyEnvelope(): Promise<GetEnvelopeResponse> {
-  const deviceId = getDeviceId();
-  const token = getAccessToken();
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+  console.log("[API] getMyEnvelope: chamada iniciada");
+  try {
+    const result = await fetchAPI<GetEnvelopeResponse>("/envelopes/me");
+    console.log("[API] getMyEnvelope: sucesso", result);
+    return result;
+  } catch (err) {
+    console.error("[API] getMyEnvelope: erro", err);
+    throw err;
   }
-
-  if (deviceId) {
-    headers["X-Device-Id"] = deviceId;
-  }
-
-  const response = await fetch(`${API_BASE_URL}/envelopes/me`, {
-    headers,
-  });
-
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ error: "Erro desconhecido" }));
-    throw new Error(error.error || `Erro ${response.status}`);
-  }
-
-  return await response.json();
 }
 
 // ==================== FILES ====================
@@ -346,7 +338,12 @@ export interface CompleteUploadRequest {
   fileName: string;
   fileSize: number;
   encryptedFek: string;
-  encryptionMetadata: {
+  fekEncryptionMetadata: {
+    algorithm: string;
+    iv: string;
+    authTag: string;
+  };
+  fileEncryptionMetadata: {
     algorithm: string;
     iv: string;
     authTag: string;
@@ -401,7 +398,12 @@ export interface DownloadFileResponse {
     fileName: string;
     presignedUrl: string;
     encryptedFek: string;
-    encryptionMetadata: {
+    fekEncryptionMetadata: {
+      algorithm: string;
+      iv: string;
+      authTag: string;
+    };
+    fileEncryptionMetadata: {
       algorithm: string;
       iv: string;
       authTag: string;
