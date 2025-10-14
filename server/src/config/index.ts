@@ -29,12 +29,10 @@ export const config = {
       10
     ), // 30 dias
   },
-  s3: {
-    endpoint: process.env.S3_ENDPOINT || "",
-    region: process.env.S3_REGION || "us-east-1",
-    accessKeyId: process.env.S3_ACCESS_KEY_ID || "",
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "",
-    bucket: process.env.S3_BUCKET || "maask-profiles",
-    forcePathStyle: process.env.S3_FORCE_PATH_STYLE === "false", // Para S3 compatíveis como MinIO
+  supabase: {
+    url: process.env.SUPABASE_URL || "",
+    anonKey: process.env.SUPABASE_ANON_KEY || "",
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
+    storageBucket: process.env.SUPABASE_STORAGE_BUCKET || "user-data",
   },
 } as const;

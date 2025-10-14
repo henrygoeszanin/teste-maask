@@ -1,6 +1,6 @@
 import { File, EncryptionMetadata } from "@/domain/entities/Files";
 import { IFileRepository } from "@/application/interfaces/IFileRepository";
-import { S3Service } from "@/infrastructure/external/S3Service";
+import { SupabaseStorageService } from "@/infrastructure/external/SupabaseStorageService";
 import { AppError } from "@/domain/errors/AppError";
 
 export interface CompleteUploadInput {
@@ -23,18 +23,18 @@ export interface CompleteUploadOutput {
 export class CompleteUploadUseCase {
   constructor(
     private fileRepository: IFileRepository,
-    private s3Service: S3Service
+    private storageService: SupabaseStorageService
   ) {}
 
   async execute(input: CompleteUploadInput): Promise<CompleteUploadOutput> {
-    // Gera o caminho no S3 (mesmo padrão usado no InitUpload)
-    const storagePath = this.s3Service.generateFileKey(
+    // Gera o caminho no Storage (mesmo padrão usado no InitUpload)
+    const storagePath = this.storageService.generateFileKey(
       input.userId,
       input.fileId
     );
 
-    // Verifica se o arquivo realmente existe no S3
-    const fileExists = await this.s3Service.fileExists(storagePath);
+    // Verifica se o arquivo realmente existe no Storage
+    const fileExists = await this.storageService.fileExists(storagePath);
 
     if (!fileExists) {
       throw new AppError(

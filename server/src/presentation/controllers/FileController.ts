@@ -4,7 +4,7 @@ import { CompleteUploadUseCase } from "@/application/usecases/CompleteUploadUseC
 import { DownloadFileUseCase } from "@/application/usecases/DownloadFileUseCase";
 import { ListFilesUseCase } from "@/application/usecases/ListFilesUseCase";
 import { FileRepository } from "@/infrastructure/repositories/FileRepository";
-import { S3Service } from "@/infrastructure/external/S3Service";
+import { SupabaseStorageService } from "@/infrastructure/external/SupabaseStorageService";
 import {
   InitUploadDTO,
   CompleteUploadDTO,
@@ -14,14 +14,14 @@ import {
 export class FileController {
   /**
    * Inicia um upload de arquivo
-   * Retorna presigned URL para upload direto ao S3
+   * Retorna presigned URL para upload direto ao Supabase Storage
    */
   static async initUpload(request: FastifyRequest, reply: FastifyReply) {
     const userId = request.user?.id!;
     const { fileName, fileSize, mimeType } = request.body as InitUploadDTO;
 
-    const s3Service = new S3Service();
-    const initUploadUseCase = new InitUploadUseCase(s3Service);
+    const storageService = new SupabaseStorageService();
+    const initUploadUseCase = new InitUploadUseCase(storageService);
 
     const result = await initUploadUseCase.execute({
       userId,
@@ -49,10 +49,10 @@ export class FileController {
     // Idealmente, deveríamos armazenar o uploadId em cache (Redis) com os metadados
 
     const fileRepository = new FileRepository();
-    const s3Service = new S3Service();
+    const storageService = new SupabaseStorageService();
     const completeUploadUseCase = new CompleteUploadUseCase(
       fileRepository,
-      s3Service
+      storageService
     );
 
     // TODO: Implementar cache para armazenar metadados temporários do upload
@@ -88,10 +88,10 @@ export class FileController {
     const { fileId } = request.params as { fileId: string };
 
     const fileRepository = new FileRepository();
-    const s3Service = new S3Service();
+    const storageService = new SupabaseStorageService();
     const downloadFileUseCase = new DownloadFileUseCase(
       fileRepository,
-      s3Service
+      storageService
     );
 
     const result = await downloadFileUseCase.execute({

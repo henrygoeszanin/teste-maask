@@ -1,5 +1,5 @@
 import { IFileRepository } from "@/application/interfaces/IFileRepository";
-import { S3Service } from "@/infrastructure/external/S3Service";
+import { SupabaseStorageService } from "@/infrastructure/external/SupabaseStorageService";
 import { NotFoundError } from "@/domain/errors/NotFoundError";
 import { AppError } from "@/domain/errors/AppError";
 
@@ -24,7 +24,7 @@ export interface DownloadFileOutput {
 export class DownloadFileUseCase {
   constructor(
     private fileRepository: IFileRepository,
-    private s3Service: S3Service
+    private storageService: SupabaseStorageService
   ) {}
 
   async execute(input: DownloadFileInput): Promise<DownloadFileOutput> {
@@ -43,8 +43,8 @@ export class DownloadFileUseCase {
       );
     }
 
-    // Verifica se o arquivo existe no S3
-    const fileExists = await this.s3Service.fileExists(file.storagePath);
+    // Verifica se o arquivo existe no Storage
+    const fileExists = await this.storageService.fileExists(file.storagePath);
 
     if (!fileExists) {
       throw new NotFoundError(
@@ -54,7 +54,7 @@ export class DownloadFileUseCase {
 
     // Gera presigned URL para download (válida por 1 hora)
     const expiresIn = 3600; // 1 hora
-    const presignedUrl = await this.s3Service.generatePresignedDownloadUrl(
+    const presignedUrl = await this.storageService.generatePresignedDownloadUrl(
       file.storagePath,
       expiresIn
     );
