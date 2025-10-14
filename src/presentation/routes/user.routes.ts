@@ -65,7 +65,7 @@ export async function userRoutes(app: FastifyInstance) {
             properties: {
               error: { type: "string" },
             },
-            example: { error: "E-mail já cadastrado" },
+            example: { error: "Email already registered" },
           },
         },
       },
@@ -126,21 +126,21 @@ export async function userRoutes(app: FastifyInstance) {
             properties: {
               error: { type: "string" },
             },
-            example: { error: "Token não fornecido" },
+            example: { error: "Token not provided" },
           },
           404: {
             type: "object",
             properties: {
               error: { type: "string" },
             },
-            example: { error: "Usuário não encontrado" },
+            example: { error: "User not found" },
           },
           409: {
             type: "object",
             properties: {
               error: { type: "string" },
             },
-            example: { error: "Este e-mail já está em uso" },
+            example: { error: "This email is already in use" },
           },
         },
       },
@@ -183,7 +183,7 @@ export async function userRoutes(app: FastifyInstance) {
             properties: {
               error: { type: "string" },
             },
-            example: { error: "Token não fornecido" },
+            example: { error: "Token not provided" },
           },
         },
         security: [{ bearerAuth: [] }],

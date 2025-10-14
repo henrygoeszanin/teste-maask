@@ -63,7 +63,7 @@ export async function authRoutes(app: FastifyInstance) {
             properties: {
               error: { type: "string" },
             },
-            example: { error: "Usuário ou senha inválidos" },
+            example: { error: "Invalid username or password" },
           },
         },
       },
@@ -107,7 +107,7 @@ export async function authRoutes(app: FastifyInstance) {
             properties: {
               error: { type: "string" },
             },
-            example: { error: "Refresh token inválido ou expirado" },
+            example: { error: "Invalid or expired refresh token" },
           },
         },
       },
