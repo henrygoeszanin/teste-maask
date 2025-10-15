@@ -30,18 +30,17 @@ export class InitUploadUseCase {
       fileId
     );
 
-    // Gera presigned URL para upload (válida por 1 hora)
-    const expiresIn = 3600; // 1 hora
+    // Gera presigned URL para upload (Supabase define expiração de 2h)
     const presignedUrl = await this.storageService.generatePresignedUploadUrl(
       storageKey,
-      expiresIn
+      false // não permite sobrescrita
     );
 
     return {
       uploadId,
       fileId,
       presignedUrl,
-      expiresIn,
+      expiresIn: 7200, // Supabase define 2 horas de expiração
     };
   }
 }

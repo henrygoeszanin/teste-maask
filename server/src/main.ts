@@ -23,7 +23,7 @@ app.setSerializerCompiler(serializerCompiler);
 
 // CORS configuration
 app.register(cors, {
-  origin: config.server.env === "development" ? "*" : false,
+  origin: config.server.env === "development" ? "*" : config.cors.origin,
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
 });

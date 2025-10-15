@@ -57,7 +57,7 @@ export class UpdateFileUseCase {
       uploadId,
       fileId,
       presignedUrl,
-      expiresIn: 3600,
+      expiresIn: 7200, // Supabase define 2 horas de expiração
     };
   }
 }

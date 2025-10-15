@@ -4,6 +4,7 @@ import argon2 from "argon2";
 import { config } from "@/config";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import { AppError } from "@/domain/errors/AppError";
 
 export interface LoginResult {
   accessToken: string;
@@ -24,14 +25,14 @@ export class LoginUseCase {
   async execute(data: LoginDTO): Promise<LoginResult> {
     const user = await this.userRepo.findByEmail(data.email);
     if (!user) {
-      throw new Error("Usuário ou senha inválidos");
+      throw new AppError("Usuário ou senha inválidos", 401);
     }
 
     // Pré-hash igual ao cadastro
     const pre = this.preHash(data.password, config.security.pepper);
     const valid = await argon2.verify(user.password, pre);
     if (!valid) {
-      throw new Error("Usuário ou senha inválidos");
+      throw new AppError("Usuário ou senha inválidos", 401);
     }
 
     // Gerar tokens JWT

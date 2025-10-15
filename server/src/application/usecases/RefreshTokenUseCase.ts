@@ -5,6 +5,7 @@ import { IUserRepository } from "../interfaces/IUserRepository";
 import { IDeviceRepository } from "../interfaces/IDeviceRepository";
 import { UserRepository } from "@/infrastructure/repositories/UserRepository";
 import { DeviceRepository } from "@/infrastructure/repositories/DeviceRepository";
+import { AppError } from "@/domain/errors/AppError";
 
 export class RefreshTokenUseCase {
   constructor(
@@ -20,14 +21,14 @@ export class RefreshTokenUseCase {
       ) as { sub: string };
 
       const user = await this.userRepo.findById(decoded.sub);
-      if (!user) throw new Error("Usuário não encontrado");
+      if (!user) throw new AppError("Usuário não encontrado", 404);
 
       // Se deviceName foi fornecido, validar se o dispositivo está ativo
       if (deviceName) {
         const devices = await this.deviceRepo.findByUserId(user.id, "active");
         const device = devices.find((d) => d.deviceName === deviceName);
         if (!device) {
-          throw new Error("DEVICE_REVOKED");
+          throw new AppError("DEVICE_REVOKED", 401);
         }
       }
 

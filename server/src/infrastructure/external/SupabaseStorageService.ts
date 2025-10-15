@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { config } from "@config/index";
+import { AppError } from "@/domain/errors/AppError";
 
 export class SupabaseStorageService {
   private client: SupabaseClient;
@@ -39,7 +40,7 @@ export class SupabaseStorageService {
       });
 
     if (error) {
-      throw new Error(`Failed to upload file: ${error.message}`);
+      throw new AppError(`Failed to upload file: ${error.message}`);
     }
   }
 
@@ -54,11 +55,11 @@ export class SupabaseStorageService {
       .download(path);
 
     if (error) {
-      throw new Error(`Failed to download file: ${error.message}`);
+      throw new AppError(`Failed to download file: ${error.message}`);
     }
 
     if (!data) {
-      throw new Error("File not found or empty");
+      throw new AppError("File not found or empty");
     }
 
     // Converte Blob para Buffer
@@ -76,7 +77,7 @@ export class SupabaseStorageService {
       .remove([path]);
 
     if (error) {
-      throw new Error(`Failed to delete file: ${error.message}`);
+      throw new AppError(`Failed to delete file: ${error.message}`);
     }
   }
 
@@ -116,7 +117,7 @@ export class SupabaseStorageService {
       });
 
     if (error || !data || data.length === 0) {
-      throw new Error("File not found");
+      throw new AppError("File not found");
     }
 
     const fileInfo = data[0];
@@ -167,7 +168,7 @@ export class SupabaseStorageService {
       });
 
     if (error || !data) {
-      throw new Error(
+      throw new AppError(
         `Failed to create signed upload URL: ${
           error?.message || "Unknown error"
         }`
@@ -194,7 +195,7 @@ export class SupabaseStorageService {
       .createSignedUrl(path, expiresIn);
 
     if (error || !data) {
-      throw new Error(
+      throw new AppError(
         `Failed to create signed URL: ${error?.message || "Unknown error"}`
       );
     }
