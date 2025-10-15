@@ -5,7 +5,7 @@ Sistema para gerenciamento seguro de perfis de navegador.
 - **Backend**: Node.js + Fastify + TypeScript + PostgreSQL + Supabase
 - **Frontend**: React + Vite + TypeScript
 
-## 🚀 Quick Start
+## �🚀 Quick Start
 
 ### Com Docker (Recomendado)
 
