@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { listDevices, revokeDevice } from '../services/api';
+import { listDevices, revokeDevice, deleteDevice } from '../services/api';
 import { getDeviceName, clearAllStorage } from '../utils/storage';
 
 interface Device {
@@ -62,6 +62,32 @@ export default function DeviceManager() {
       await loadDevices();
     } catch (error) {
       setMessage(`❌ Erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (device: Device) => {
+    if (device.status !== 'revoked') {
+      setMessage('❌ Apenas dispositivos revogados podem ser deletados. Revogue o dispositivo primeiro.');
+      return;
+    }
+
+    if (!confirm(`⚠️ Tem certeza que deseja DELETAR permanentemente o dispositivo "${device.deviceName}"?\n\nEsta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    setMessage('');
+    setLoading(true);
+
+    try {
+      setMessage(`🗑️ Deletando dispositivo ${device.deviceName}...`);
+      await deleteDevice(device.id);
+
+      setMessage(`✅ Dispositivo "${device.deviceName}" deletado com sucesso!`);
+      await loadDevices();
+    } catch (error) {
+      setMessage(`❌ Erro ao deletar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setLoading(false);
     }
@@ -153,6 +179,21 @@ export default function DeviceManager() {
                         }}
                       >
                         {loading ? '⏳ Revogando...' : '🚫 Revogar'}
+                      </button>
+                    </div>
+                  )}
+
+                  {!isCurrentDevice && device.status === 'revoked' && (
+                    <div style={styles.deviceActions}>
+                      <button
+                        onClick={() => handleDelete(device)}
+                        disabled={loading}
+                        style={{
+                          ...styles.deleteButton,
+                          ...(loading ? styles.buttonDisabled : {})
+                        }}
+                      >
+                        {loading ? '⏳ Deletando...' : '🗑️ Deletar'}
                       </button>
                     </div>
                   )}
@@ -296,7 +337,18 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: '600',
-    transition: 'opacity 0.3s',
+    transition: 'opacity 0.3s, background 0.3s',
+  },
+  deleteButton: {
+    padding: '8px 16px',
+    background: '#6c757d',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    transition: 'opacity 0.3s, background 0.3s',
   },
   buttonDisabled: {
     opacity: 0.6,

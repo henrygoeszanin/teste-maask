@@ -101,3 +101,20 @@ export const AuthorizeDeviceResponseSchema = z.object({
     authorizedAt: z.string().datetime(),
   }),
 });
+
+// Schema para deletar dispositivo (params)
+export const DeleteDeviceParamSchema = z.object({
+  deviceId: z.string().min(1, "deviceId é obrigatório"),
+});
+
+export type DeleteDeviceParamDTO = z.infer<typeof DeleteDeviceParamSchema>;
+
+// Schema de resposta para deleção de dispositivo
+export const DeleteDeviceResponseSchema = z.object({
+  message: z.string(),
+  data: z.object({
+    deviceId: z.string(),
+    deviceName: z.string(),
+    deletedAt: z.string().datetime(),
+  }),
+});

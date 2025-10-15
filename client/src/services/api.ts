@@ -289,6 +289,23 @@ export async function revokeDevice(
   });
 }
 
+export interface DeleteDeviceResponse {
+  message: string;
+  data: {
+    deviceId: string;
+    deviceName: string;
+    deletedAt: string;
+  };
+}
+
+export async function deleteDevice(
+  deviceId: string
+): Promise<DeleteDeviceResponse> {
+  return fetchAPI<DeleteDeviceResponse>(`/devices/${deviceId}`, {
+    method: "DELETE",
+  });
+}
+
 // ==================== FILES ====================
 
 export interface InitUploadRequest {

@@ -14,6 +14,8 @@ import {
   AuthorizeDeviceSchema,
   RevokeDeviceResponseSchema,
   RevokeDeviceSchema,
+  DeleteDeviceParamSchema,
+  DeleteDeviceResponseSchema,
 } from "@/application/dtos/device.dto";
 
 // Helper para adicionar exemplos aos schemas Zod
@@ -192,5 +194,48 @@ export async function deviceRoutes(
       },
     },
     revocationController.revokeDevice.bind(revocationController)
+  );
+
+  // Deletar dispositivo revogado
+  app.withTypeProvider<ZodTypeProvider>().delete(
+    "/devices/:deviceId",
+    {
+      preHandler: authenticate,
+      schema: {
+        tags: ["Devices"],
+        description:
+          "Deleta um dispositivo revogado (requer Bearer token). Apenas dispositivos com status 'revoked' podem ser deletados.",
+        params: DeleteDeviceParamSchema,
+        response: {
+          200: withExamples(DeleteDeviceResponseSchema, [
+            {
+              message: "Dispositivo deletado com sucesso",
+              data: {
+                deviceId: "device-ulid-123",
+                deviceName: "Web-Win32-1744392847291",
+                deletedAt: "2025-10-14T12:05:00.000Z",
+              },
+            },
+          ]),
+          400: withExamples(DeviceErrorResponseSchema, [
+            {
+              error:
+                "Only revoked devices can be deleted. Revoke the device first.",
+            },
+          ]),
+          401: withExamples(DeviceErrorResponseSchema, [
+            { error: "Token not provided" },
+          ]),
+          403: withExamples(DeviceErrorResponseSchema, [
+            { error: "Unauthorized to delete this device" },
+          ]),
+          404: withExamples(DeviceErrorResponseSchema, [
+            { error: "Device not found" },
+          ]),
+        },
+        security: [{ bearerAuth: [] }],
+      },
+    },
+    DeviceController.delete
   );
 }
