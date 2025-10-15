@@ -1,6 +1,5 @@
 import { IFileRepository } from "@/application/interfaces/IFileRepository";
 import { SupabaseStorageService } from "@/infrastructure/external/SupabaseStorageService";
-import { NotFoundError } from "@/domain/errors/NotFoundError";
 import { AppError } from "@/domain/errors/AppError";
 
 export interface DownloadFileInput {
@@ -26,7 +25,7 @@ export class DownloadFileUseCase {
     const file = await this.fileRepository.findByFileId(input.fileId);
 
     if (!file) {
-      throw new NotFoundError("Arquivo não encontrado");
+      throw new AppError("Arquivo não encontrado", 404);
     }
 
     // Verifica se o arquivo pertence ao usuário
@@ -41,8 +40,9 @@ export class DownloadFileUseCase {
     const fileExists = await this.storageService.fileExists(file.storagePath);
 
     if (!fileExists) {
-      throw new NotFoundError(
-        "Arquivo não encontrado no storage. Pode ter sido deletado."
+      throw new AppError(
+        "Arquivo não encontrado no storage. Pode ter sido deletado.",
+        404
       );
     }
 

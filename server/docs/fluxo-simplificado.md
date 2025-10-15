@@ -249,7 +249,7 @@ Response: {
 
 ```
 user.routes.ts (GET /me)
-  → preHandler: authenticate
+  → preHandler: [authenticate]
   → UserController.getMe()
     → UserRepository.findById()
       → PostgreSQL (users table)
@@ -320,7 +320,7 @@ Response: {
 
 ```
 device.routes.ts (POST /devices)
-  → preHandler: authenticate
+  → preHandler: [authenticate]
   → validateBody(RegisterDeviceSchema)
   → DeviceController.register()
     → RegisterDeviceUseCase.execute()
@@ -395,7 +395,7 @@ Response: {
 
 ```
 file.routes.ts (POST /files/upload/init)
-  → preHandler: authenticate
+  → preHandler: [authenticate]
   → validateBody(InitUploadSchema)
   → FileController.initUpload()
     → InitUploadUseCase.execute()
@@ -540,7 +540,7 @@ Response: {
 
 ```
 file.routes.ts (POST /files/upload/complete)
-  → preHandler: authenticate
+  → preHandler: [authenticate]
   → validateBody(CompleteUploadSchema)
   → FileController.completeUpload()
     → CompleteUploadUseCase.execute()
@@ -626,7 +626,7 @@ Response: {
 
 ```
 file.routes.ts (GET /files/:fileId/download)
-  → preHandler: authenticate
+  → preHandler: [authenticate]
   → FileController.download()
     → DownloadFileUseCase.execute()
       → FileRepository.findByFileId()
@@ -805,7 +805,7 @@ Response: {
 
 ```
 device.routes.ts (POST /devices/revoke)
-  → preHandler: authenticate
+  → preHandler: [authenticate]
   → validateBody(RevokeDeviceSchema)
   → DeviceRevocationController.revokeDevice()
     → RevokeDeviceUseCase.execute()

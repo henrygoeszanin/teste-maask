@@ -26,7 +26,7 @@ export async function deviceRoutes(
   app.withTypeProvider<ZodTypeProvider>().post(
     "/devices",
     {
-      preHandler: authenticate,
+      preHandler: [authenticate],
       schema: {
         tags: ["Devices"],
         description:
@@ -59,7 +59,7 @@ export async function deviceRoutes(
   app.withTypeProvider<ZodTypeProvider>().get(
     "/devices",
     {
-      preHandler: authenticate,
+      preHandler: [authenticate],
       schema: {
         tags: ["Devices"],
         description:
@@ -92,7 +92,7 @@ export async function deviceRoutes(
   app.withTypeProvider<ZodTypeProvider>().get(
     "/devices/:id",
     {
-      preHandler: authenticate,
+      preHandler: [authenticate],
       schema: {
         tags: ["Devices"],
         description:
@@ -127,7 +127,7 @@ export async function deviceRoutes(
   app.withTypeProvider<ZodTypeProvider>().post(
     "/devices/revoke",
     {
-      preHandler: authenticate,
+      preHandler: [authenticate],
       schema: {
         tags: ["Devices"],
         description:
@@ -181,7 +181,7 @@ export async function deviceRoutes(
   app.withTypeProvider<ZodTypeProvider>().delete(
     "/devices/:deviceId",
     {
-      preHandler: authenticate,
+      preHandler: [authenticate],
       schema: {
         tags: ["Devices"],
         description:

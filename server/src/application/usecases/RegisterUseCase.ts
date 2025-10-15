@@ -4,7 +4,7 @@ import crypto from "crypto";
 import argon2 from "argon2";
 import { IUserRepository, PublicUser } from "../interfaces/IUserRepository";
 import { User } from "@domain/entities/User";
-import { UserAlreadyExistsError } from "@/domain/errors/UserAlreadyExistsError";
+import { AppError } from "@/domain/errors/AppError";
 
 export class RegisterUseCase {
   constructor(private readonly userRepo: IUserRepository) {}
@@ -16,7 +16,7 @@ export class RegisterUseCase {
     // Verifica se já existe usuário com o e-mail
     const existing = await this.userRepo.findByEmail(data.email);
     if (existing) {
-      throw new UserAlreadyExistsError(data.email);
+      throw new AppError("Email already exists", 400);
     }
 
     const passwordSalt = this.genSalt();

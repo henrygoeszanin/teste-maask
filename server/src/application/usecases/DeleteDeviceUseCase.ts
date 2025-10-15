@@ -1,5 +1,4 @@
 import { IDeviceRepository } from "@/application/interfaces/IDeviceRepository";
-import { NotFoundError } from "@/domain/errors/NotFoundError";
 import { AppError } from "@/domain/errors/AppError";
 
 export interface DeleteDeviceInput {
@@ -27,7 +26,7 @@ export class DeleteDeviceUseCase {
     const device = await this.deviceRepository.findById(deviceId);
 
     if (!device) {
-      throw new NotFoundError("Device not found");
+      throw new AppError("Device not found", 404);
     }
 
     // Verifica se pertence ao usuário

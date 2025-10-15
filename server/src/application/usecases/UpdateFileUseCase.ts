@@ -1,6 +1,5 @@
 import { IFileRepository } from "@/application/interfaces/IFileRepository";
 import { SupabaseStorageService } from "@/infrastructure/external/SupabaseStorageService";
-import { NotFoundError } from "@/domain/errors/NotFoundError";
 import { AppError } from "@/domain/errors/AppError";
 import { ulid } from "ulid";
 
@@ -29,13 +28,13 @@ export class UpdateFileUseCase {
   ) {}
 
   async execute(input: UpdateFileInput): Promise<UpdateFileOutput> {
-    const { userId, fileId, fileName, fileSize } = input;
+    const { userId, fileId } = input;
 
     // Verifica se o arquivo existe e pertence ao usuário
     const existingFile = await this.fileRepository.findByFileId(fileId);
 
     if (!existingFile) {
-      throw new NotFoundError("File not found");
+      throw new AppError("File not found", 404);
     }
 
     if (existingFile.userId !== userId) {
@@ -51,12 +50,7 @@ export class UpdateFileUseCase {
     // Gera URL presignada para upload do novo conteúdo (com permissão para sobrescrever)
     const presignedUrl = await this.storageService.generatePresignedUploadUrl(
       storageKey,
-      3600,
       true // allowOverwrite = true para atualização
-    );
-
-    console.log(
-      `[UpdateFile] Atualização iniciada - File: ${fileId}, UploadId: ${uploadId}`
     );
 
     return {

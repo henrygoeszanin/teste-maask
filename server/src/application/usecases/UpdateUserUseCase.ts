@@ -1,7 +1,6 @@
+import { AppError } from "@/domain/errors/AppError";
 import { UpdateUserDTO } from "../dtos/user.dto";
 import { IUserRepository, PublicUser } from "../interfaces/IUserRepository";
-import { NotFoundError } from "@/domain/errors/NotFoundError";
-import { UserAlreadyExistsError } from "@/domain/errors/UserAlreadyExistsError";
 
 export class UpdateUserUseCase {
   constructor(private readonly userRepo: IUserRepository) {}
@@ -10,7 +9,7 @@ export class UpdateUserUseCase {
     // Verifica se o usuário existe
     const user = await this.userRepo.findById(userId);
     if (!user) {
-      throw new NotFoundError("Usuário não encontrado");
+      throw new AppError("Usuário não encontrado", 404);
     }
 
     // Atualiza apenas os campos fornecidos

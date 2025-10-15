@@ -1,6 +1,5 @@
 import { Device } from "@/domain/entities/Devices";
 import { IDeviceRepository } from "@/application/interfaces/IDeviceRepository";
-import { AppError } from "@/domain/errors/AppError";
 
 export interface RegisterDeviceInput {
   userId: string;

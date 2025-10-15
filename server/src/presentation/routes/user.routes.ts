@@ -5,7 +5,6 @@ import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { RegisterUseCase } from "@/application/usecases/RegisterUseCase";
 import { UpdateUserUseCase } from "@/application/usecases/UpdateUserUseCase";
 import { authenticate } from "../middlewares/authenticate";
-import { z } from "zod";
 import {
   RegisterSchema,
   UpdateUserSchema,
@@ -15,7 +14,7 @@ import {
 } from "@application/dtos/user.dto";
 import { withExamples } from "../utils";
 
-export async function userRoutes(app: FastifyInstance) {
+export function userRoutes(app: FastifyInstance) {
   const userRepository = new UserRepository();
   const userController = new UserController(
     new RegisterUseCase(userRepository),
@@ -62,7 +61,7 @@ export async function userRoutes(app: FastifyInstance) {
   app.withTypeProvider<ZodTypeProvider>().patch(
     "/me",
     {
-      preHandler: authenticate,
+      preHandler: [authenticate],
       schema: {
         tags: ["Users"],
         description:
@@ -104,7 +103,7 @@ export async function userRoutes(app: FastifyInstance) {
   app.withTypeProvider<ZodTypeProvider>().get(
     "/me",
     {
-      preHandler: authenticate,
+      preHandler: [authenticate],
       schema: {
         tags: ["Users"],
         description:

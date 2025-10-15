@@ -11,7 +11,7 @@ export class HealthController {
    */
   async check(request: FastifyRequest, reply: FastifyReply) {
     try {
-      let dbStatus = "ok";
+      const dbStatus = "ok";
       let dbLatency = null;
       const start = Date.now();
       // Executa uma query simples para testar conexão e latência

@@ -1,9 +1,9 @@
 import { FastifyInstance } from "fastify";
-import { Server as SocketIOServer } from "socket.io";
+import { Server as SocketIOServer, Socket } from "socket.io";
 import jwt from "jsonwebtoken";
 import { config } from "@/config";
 
-export interface AuthenticatedSocket {
+export interface AuthenticatedSocket extends Socket {
   userId: string;
   deviceName: string;
   email: string;
@@ -35,10 +35,12 @@ export class SocketGateway {
    * Valida JWT antes de aceitar conexão
    */
   private setupMiddleware() {
-    this.io.use(async (socket, next) => {
+    this.io.use((socket, next) => {
       try {
-        const token = socket.handshake.auth.token;
-        const deviceName = socket.handshake.auth.deviceName;
+        const { token, deviceName } = socket.handshake.auth as {
+          token?: string;
+          deviceName?: string;
+        };
 
         if (!token) {
           return next(new Error("Authentication token required"));
@@ -55,12 +57,13 @@ export class SocketGateway {
           name: string;
         };
 
-        // Adiciona dados do usuário ao socket
-        (socket as any).userId = decoded.sub;
-        (socket as any).deviceName = deviceName;
-        (socket as any).email = decoded.email;
+        // Adiciona dados do usuário ao socket tipado
+        const authSocket = socket as AuthenticatedSocket;
+        authSocket.userId = decoded.sub;
+        authSocket.deviceName = deviceName;
+        authSocket.email = decoded.email;
 
-        console.log(
+        console.info(
           `[SocketGateway] Cliente autenticado: ${decoded.email} (Device: ${deviceName})`
         );
 
@@ -77,25 +80,24 @@ export class SocketGateway {
    */
   private setupEventHandlers() {
     this.io.on("connection", (socket) => {
-      const userId = (socket as any).userId;
-      const deviceName = (socket as any).deviceName;
-      const email = (socket as any).email;
+      const authSocket = socket as AuthenticatedSocket;
+      const { userId, deviceName, email } = authSocket;
 
-      console.log(
+      console.info(
         `[SocketGateway] Nova conexão: ${email} (Device: ${deviceName})`
       );
 
       // Entra na room do usuário (para broadcasts direcionados)
-      socket.join(userId);
+      void authSocket.join(userId);
 
       // Evento de heartbeat (cliente envia ping)
-      socket.on("ping", () => {
-        socket.emit("pong");
+      authSocket.on("ping", () => {
+        authSocket.emit("pong");
       });
 
       // Desconexão
-      socket.on("disconnect", (reason) => {
-        console.log(
+      authSocket.on("disconnect", (reason) => {
+        console.info(
           `[SocketGateway] Desconectado: ${email} (Device: ${deviceName}) - Razão: ${reason}`
         );
       });
@@ -107,7 +109,7 @@ export class SocketGateway {
    * Emite evento para todos os sockets na room do usuário
    */
   public notifyDeviceRevoked(userId: string, deviceName: string) {
-    console.log(
+    console.info(
       `[SocketGateway] Notificando revogação: User ${userId}, Device ${deviceName}`
     );
 

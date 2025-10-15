@@ -1,14 +1,18 @@
-import { FastifyRequest, FastifyReply } from "fastify";
+import { FastifyRequest } from "fastify";
 import { AppError } from "@/domain/errors/AppError";
+
+// Estende o tipo FastifyRequest para incluir deviceId
+declare module "fastify" {
+  interface FastifyRequest {
+    deviceId: string;
+  }
+}
 
 /**
  * Middleware para validar o header X-Device-Id
  * Usado em rotas sensíveis que requerem identificação do dispositivo
  */
-export async function validateDeviceId(
-  request: FastifyRequest,
-  reply: FastifyReply
-) {
+export function validateDeviceId(request: FastifyRequest) {
   const deviceId = request.headers["x-device-id"];
 
   if (!deviceId) {
@@ -28,5 +32,5 @@ export async function validateDeviceId(
   }
 
   // Adiciona deviceId ao request para uso posterior
-  (request as any).deviceId = deviceId;
+  request.deviceId = deviceId;
 }

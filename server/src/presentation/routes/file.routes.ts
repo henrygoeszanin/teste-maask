@@ -18,12 +18,12 @@ import {
 } from "@application/dtos/file.dto";
 import { withExamples } from "../utils";
 
-export async function fileRoutes(app: FastifyInstance) {
+export function fileRoutes(app: FastifyInstance) {
   // Iniciar upload
   app.withTypeProvider<ZodTypeProvider>().post(
     "/files/upload/init",
     {
-      preHandler: authenticate,
+      preHandler: [authenticate],
       schema: {
         tags: ["Files"],
         description:
@@ -64,7 +64,7 @@ export async function fileRoutes(app: FastifyInstance) {
   app.withTypeProvider<ZodTypeProvider>().post(
     "/files/upload/complete",
     {
-      preHandler: authenticate,
+      preHandler: [authenticate],
       schema: {
         tags: ["Files"],
         description:
@@ -115,7 +115,7 @@ export async function fileRoutes(app: FastifyInstance) {
   app.withTypeProvider<ZodTypeProvider>().get(
     "/files/:fileId/download",
     {
-      preHandler: authenticate,
+      preHandler: [authenticate],
       schema: {
         tags: ["Files"],
         description:
@@ -165,7 +165,7 @@ export async function fileRoutes(app: FastifyInstance) {
   app.withTypeProvider<ZodTypeProvider>().get(
     "/files",
     {
-      preHandler: authenticate,
+      preHandler: [authenticate],
       schema: {
         tags: ["Files"],
         description:
@@ -209,7 +209,7 @@ export async function fileRoutes(app: FastifyInstance) {
   app.withTypeProvider<ZodTypeProvider>().put(
     "/files/:fileId",
     {
-      preHandler: authenticate,
+      preHandler: [authenticate],
       schema: {
         tags: ["Files"],
         description:
@@ -254,7 +254,7 @@ export async function fileRoutes(app: FastifyInstance) {
   app.withTypeProvider<ZodTypeProvider>().delete(
     "/files/:fileId",
     {
-      preHandler: authenticate,
+      preHandler: [authenticate],
       schema: {
         tags: ["Files"],
         description:

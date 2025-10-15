@@ -68,10 +68,10 @@ app.register(swagger, {
       for (const [statusCode, responseSchema] of Object.entries(
         schema.response
       )) {
-        if ((responseSchema as any)._examples) {
+        if (responseSchema._examples) {
           transformedResponse[statusCode] = {
             ...responseSchema,
-            examples: (responseSchema as any)._examples,
+            examples: responseSchema._examples,
           };
         } else {
           transformedResponse[statusCode] = responseSchema;
@@ -109,20 +109,20 @@ app.setErrorHandler((error, request, reply) => {
 
 // Inicializa Socket.IO Gateway
 const socketGateway = new SocketGateway(app);
-console.log("✅ Socket.IO Gateway inicializado");
-
-// Register routes (passa socketGateway para as rotas)
-registerRoutes(app, socketGateway);
+console.info("✅ Socket.IO Gateway inicializado");
 
 // Start server
 const start = async () => {
   try {
+    // Register routes (passa socketGateway para as rotas)
+    await registerRoutes(app, socketGateway);
+
     await app.listen({
       port: config.server.port,
       host: config.server.host,
     });
 
-    console.log(
+    console.info(
       `🚀 Server is running on http://${config.server.host}:${config.server.port}`
     );
   } catch (err) {
@@ -131,4 +131,5 @@ const start = async () => {
   }
 };
 
-start();
+// Inicia o servidor
+void start();

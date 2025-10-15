@@ -1,6 +1,5 @@
 import { IFileRepository } from "@/application/interfaces/IFileRepository";
 import { SupabaseStorageService } from "@/infrastructure/external/SupabaseStorageService";
-import { NotFoundError } from "@/domain/errors/NotFoundError";
 import { AppError } from "@/domain/errors/AppError";
 
 export interface DeleteFileInput {
@@ -31,7 +30,7 @@ export class DeleteFileUseCase {
     const existingFile = await this.fileRepository.findByFileId(fileId);
 
     if (!existingFile) {
-      throw new NotFoundError("File not found");
+      throw new AppError("File not found", 404);
     }
 
     if (existingFile.userId !== userId) {

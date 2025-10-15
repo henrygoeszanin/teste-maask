@@ -3,6 +3,7 @@ import { IUserRepository } from "../interfaces/IUserRepository";
 import argon2 from "argon2";
 import { config } from "@/config";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
 export interface LoginResult {
   accessToken: string;
@@ -58,9 +59,7 @@ export class LoginUseCase {
       criptografyCode: user.criptografyCode,
     };
   }
-
   private preHash(password: string, pepper: string): Buffer {
-    const crypto = require("crypto");
     return crypto.createHmac("sha256", pepper).update(password).digest();
   }
 }
