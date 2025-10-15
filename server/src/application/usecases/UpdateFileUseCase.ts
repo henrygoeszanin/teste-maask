@@ -48,10 +48,11 @@ export class UpdateFileUseCase {
     // Gera caminho do arquivo no storage
     const storageKey = this.storageService.generateFileKey(userId, fileId);
 
-    // Gera URL presignada para upload do novo conteúdo
+    // Gera URL presignada para upload do novo conteúdo (com permissão para sobrescrever)
     const presignedUrl = await this.storageService.generatePresignedUploadUrl(
       storageKey,
-      3600
+      3600,
+      true // allowOverwrite = true para atualização
     );
 
     console.log(

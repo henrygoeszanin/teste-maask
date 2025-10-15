@@ -27,9 +27,16 @@ async function fetchAPI<T>(
   const deviceName = getDeviceName();
 
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
+
+  // Só adiciona Content-Type se não for DELETE ou GET sem body
+  const method = options.method?.toUpperCase() || 'GET';
+  const hasBody = options.body !== undefined && options.body !== null;
+  
+  if (hasBody && method !== 'DELETE') {
+    headers["Content-Type"] = "application/json";
+  }
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;

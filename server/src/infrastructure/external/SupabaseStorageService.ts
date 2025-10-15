@@ -133,12 +133,32 @@ export class SupabaseStorageService {
    * Gera uma URL assinada para upload direto ao Supabase Storage
    * @param path - Caminho do arquivo no bucket
    * @param expiresIn - Tempo de expiração em segundos (padrão: 3600 = 1 hora)
+   * @param allowOverwrite - Se true, permite sobrescrever arquivo existente
    * @returns URL assinada para upload
    */
   async generatePresignedUploadUrl(
     path: string,
-    expiresIn: number = 3600
+    expiresIn: number = 3600,
+    allowOverwrite: boolean = false
   ): Promise<string> {
+    // Se permitir sobrescrita e arquivo existe, deleta primeiro
+    if (allowOverwrite) {
+      const exists = await this.fileExists(path);
+      if (exists) {
+        console.log(
+          `[Supabase] Deletando arquivo existente antes do upload: ${path}`
+        );
+        try {
+          await this.deleteFile(path);
+        } catch (error) {
+          console.warn(
+            `[Supabase] Erro ao deletar arquivo existente: ${error}`
+          );
+          // Continua mesmo se falhar ao deletar
+        }
+      }
+    }
+
     // Usa createSignedUploadUrl do Supabase para upload direto do cliente
     // Similar às presigned URLs do S3, mas gerenciado pelo Supabase
     const { data, error } = await this.client.storage
