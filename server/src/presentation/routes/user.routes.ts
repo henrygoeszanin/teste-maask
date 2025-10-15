@@ -13,13 +13,7 @@ import {
   UserMeResponseSchema,
   ErrorResponseSchema,
 } from "@application/dtos/user.dto";
-
-// Helper para adicionar exemplos aos schemas Zod
-function withExamples<T extends z.ZodType<any>>(zodSchema: T, examples: any[]) {
-  const schemaWithExamples = zodSchema as T & { _examples?: any[] };
-  (schemaWithExamples as any)._examples = examples;
-  return schemaWithExamples;
-}
+import { withExamples } from "../utils";
 
 export async function userRoutes(app: FastifyInstance) {
   const userRepository = new UserRepository();

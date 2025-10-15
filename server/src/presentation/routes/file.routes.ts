@@ -2,7 +2,6 @@ import { FastifyInstance } from "fastify";
 import { FileController } from "@/presentation/controllers/FileController";
 import { authenticate } from "@/presentation/middlewares/authenticate";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
-import { z } from "zod";
 import {
   InitUploadSchema,
   InitUploadResponseSchema,
@@ -17,13 +16,7 @@ import {
   DeleteFileResponseSchema,
   ErrorResponseSchema,
 } from "@application/dtos/file.dto";
-
-// Helper para adicionar exemplos aos schemas Zod
-function withExamples<T extends z.ZodType<any>>(zodSchema: T, examples: any[]) {
-  const schemaWithExamples = zodSchema as T & { _examples?: any[] };
-  (schemaWithExamples as any)._examples = examples;
-  return schemaWithExamples;
-}
+import { withExamples } from "../utils";
 
 export async function fileRoutes(app: FastifyInstance) {
   // Iniciar upload

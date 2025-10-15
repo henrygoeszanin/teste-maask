@@ -1,9 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { HealthController } from "../controllers/HealthController";
-import {
-  HealthResponseSchema,
-  HealthFullResponseSchema,
-} from "@/application/dtos/health.dto";
+import { HealthFullResponseSchema } from "@/application/dtos/health.dto";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 
 export async function healthRoutes(app: FastifyInstance) {

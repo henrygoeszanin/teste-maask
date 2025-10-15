@@ -1,38 +1,26 @@
 import { FastifyInstance } from "fastify";
 import { DeviceController } from "@/presentation/controllers/DeviceController";
-import { DeviceRevocationController } from "@/presentation/controllers/DeviceRevocationController";
 import { SocketGateway } from "@/presentation/gateways/SocketGateway";
 import { authenticate } from "@/presentation/middlewares/authenticate";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
-import { z } from "zod";
 import {
   DeviceListResponseSchema,
   DeviceErrorResponseSchema,
   RegisterDeviceSchema,
   DeviceResponseSchema,
-  AuthorizeDeviceResponseSchema,
-  AuthorizeDeviceSchema,
   RevokeDeviceResponseSchema,
   RevokeDeviceSchema,
   DeleteDeviceParamSchema,
   DeleteDeviceResponseSchema,
 } from "@/application/dtos/device.dto";
-
-// Helper para adicionar exemplos aos schemas Zod
-function withExamples<T extends z.ZodType<any>>(zodSchema: T, examples: any[]) {
-  const schemaWithExamples = zodSchema as T & { _examples?: any[] };
-  (schemaWithExamples as any)._examples = examples;
-  return schemaWithExamples;
-}
+import { withExamples } from "../utils";
+import z from "zod";
 
 export async function deviceRoutes(
   app: FastifyInstance,
   options: { socketGateway: SocketGateway }
 ) {
-  const { socketGateway } = options;
-
-  // Instancia o controller de revogação com Socket.IO
-  const revocationController = new DeviceRevocationController(socketGateway);
+  const deviceController = new DeviceController(options.socketGateway);
 
   // Registrar novo dispositivo
   app.withTypeProvider<ZodTypeProvider>().post(
@@ -55,8 +43,6 @@ export async function deviceRoutes(
               deviceName: "Meu notebook pessoal",
               status: "active",
               createdAt: "2025-10-14T12:00:00.000Z",
-              updatedAt: "2025-10-14T12:00:00.000Z",
-              userId: "user-ulid-123",
             },
           ]),
           401: withExamples(DeviceErrorResponseSchema, [
@@ -66,7 +52,7 @@ export async function deviceRoutes(
         security: [{ bearerAuth: [] }],
       },
     },
-    DeviceController.register
+    deviceController.register.bind(deviceController)
   );
 
   // Listar dispositivos do usuário
@@ -88,7 +74,6 @@ export async function deviceRoutes(
                   status: "active",
                   createdAt: "2025-10-14T12:00:00.000Z",
                   updatedAt: "2025-10-14T12:00:00.000Z",
-                  userId: "user-ulid-123",
                 },
               ],
             },
@@ -100,7 +85,7 @@ export async function deviceRoutes(
         security: [{ bearerAuth: [] }],
       },
     },
-    DeviceController.list
+    deviceController.list.bind(deviceController)
   );
 
   // Buscar dispositivo específico por ID
@@ -112,20 +97,16 @@ export async function deviceRoutes(
         tags: ["Devices"],
         description:
           "Busca um dispositivo específico por ID (requer Bearer token)",
-        params: z.object({
-          id: z.string().min(1, "Device ID is required"),
-        }),
+        params: DeleteDeviceParamSchema,
         response: {
-          200: z.object({
-            data: z.object({
-              id: z.string(),
-              deviceName: z.string(),
-              status: z.string(),
-              createdAt: z.string(),
-              updatedAt: z.string(),
-              userId: z.string(),
-            }),
-          }),
+          200: withExamples(DeviceResponseSchema, [
+            {
+              id: "device-ulid-123",
+              deviceName: "Meu notebook pessoal",
+              status: "active",
+              createdAt: "2025-10-14T12:00:00.000Z",
+            },
+          ]),
           404: withExamples(DeviceErrorResponseSchema, [
             { error: "Device not found" },
           ]),
@@ -139,7 +120,7 @@ export async function deviceRoutes(
         security: [{ bearerAuth: [] }],
       },
     },
-    DeviceController.getById
+    deviceController.getById.bind(deviceController)
   );
 
   // ⚠️ Revogar dispositivo com segurança reforçada (requer senha)
@@ -193,7 +174,7 @@ export async function deviceRoutes(
         security: [{ bearerAuth: [] }],
       },
     },
-    revocationController.revokeDevice.bind(revocationController)
+    deviceController.revokeDevice.bind(deviceController)
   );
 
   // Deletar dispositivo revogado
@@ -236,6 +217,6 @@ export async function deviceRoutes(
         security: [{ bearerAuth: [] }],
       },
     },
-    DeviceController.delete
+    deviceController.delete.bind(deviceController)
   );
 }

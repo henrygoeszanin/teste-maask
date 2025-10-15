@@ -1,6 +1,5 @@
 import { IDeviceRepository } from "@/application/interfaces/IDeviceRepository";
 import { IUserRepository } from "@/application/interfaces/IUserRepository";
-import { NotFoundError } from "@/domain/errors/NotFoundError";
 import { AppError } from "@/domain/errors/AppError";
 import argon2 from "argon2";
 import { config } from "@/config";
@@ -32,11 +31,11 @@ export class RevokeDeviceUseCase {
   async execute(input: RevokeDeviceInput): Promise<void> {
     const { userId, deviceNameToRevoke, currentDeviceName, password } = input;
 
-    // 1. ⚠️ VALIDAÇÃO CRÍTICA: Verifica senha do usuário
+    // VALIDAÇÃO CRÍTICA: Verifica senha do usuário para a desativação do
     const user = await this.userRepository.findById(userId);
 
     if (!user) {
-      throw new NotFoundError("User not found");
+      throw new AppError("User not found", 404);
     }
 
     const pre = this.preHash(password, config.security.pepper);
@@ -52,7 +51,7 @@ export class RevokeDeviceUseCase {
     );
 
     if (!currentDevice) {
-      throw new NotFoundError("Current device not found");
+      throw new AppError("Current device not found", 404);
     }
 
     if (currentDevice.userId !== userId) {
@@ -69,7 +68,7 @@ export class RevokeDeviceUseCase {
     );
 
     if (!deviceToRevoke) {
-      throw new NotFoundError("Device to revoke not found");
+      throw new AppError("Device to revoke not found", 404);
     }
 
     if (deviceToRevoke.userId !== userId) {

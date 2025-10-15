@@ -1,10 +1,9 @@
 import { RegisterDTO, UpdateUserDTO } from "@/application/dtos/user.dto";
 import { FastifyReply, FastifyRequest } from "fastify";
-import { UserAlreadyExistsError } from "@/domain/errors/UserAlreadyExistsError";
 import { RegisterUseCase } from "@/application/usecases/RegisterUseCase";
 import { UpdateUserUseCase } from "@/application/usecases/UpdateUserUseCase";
-import { NotFoundError } from "@/domain/errors/NotFoundError";
 import crypto from "crypto";
+import { AppError } from "@/domain/errors/AppError";
 
 export class UserController {
   constructor(
@@ -12,9 +11,15 @@ export class UserController {
     private readonly updateUserUseCase: UpdateUserUseCase
   ) {}
 
+  /**
+   * Cria um novo usuário no sistema
+   * @param request - Requisição Fastify contendo dados do usuário (name, email, password)
+   * @param reply - Resposta Fastify
+   * @returns Retorna dados do usuário criado com código de criptografia, ou erro 409 se email já existe
+   */
   async create(request: FastifyRequest, reply: FastifyReply) {
-    const userData = request.body as RegisterDTO;
     try {
+      const userData = request.body as RegisterDTO;
       const newCryptografyCode = crypto.randomBytes(64).toString("hex"); // Gera um código de criptografia aleatório
 
       const response = await this.registerUseCase.execute(
@@ -38,19 +43,27 @@ export class UserController {
         data,
       });
     } catch (error) {
-      if (error instanceof UserAlreadyExistsError) {
-        return reply.status(409).send({ error: error.message });
+      if (error instanceof AppError) {
+        return reply.status(error.statusCode).send({ error: error.message });
+      } else {
+        return reply
+          .status(500)
+          .send({ error: "unknown error", details: String(error) });
       }
-      // fallback para outros erros
-      return reply.status(500).send({ error: "Erro interno do servidor" });
     }
   }
 
+  /**
+   * Atualiza os dados do usuário autenticado
+   * @param request - Requisição Fastify contendo dados para atualização (name, email)
+   * @param reply - Resposta Fastify
+   * @returns Retorna dados do usuário atualizado, ou erro 404 se usuário não encontrado, erro 409 se email já existe
+   */
   async updateMe(request: FastifyRequest, reply: FastifyReply) {
-    const updateData = request.body as UpdateUserDTO;
-    const userId = request.user!.id; // O middleware de autenticação garante que user existe
-
     try {
+      const updateData = request.body as UpdateUserDTO;
+      const userId = request.user!.id; // O middleware de autenticação garante que user existe
+
       const updatedUser = await this.updateUserUseCase.execute(
         userId,
         updateData
@@ -72,21 +85,37 @@ export class UserController {
         data,
       });
     } catch (error) {
-      if (error instanceof NotFoundError) {
-        return reply.status(404).send({ error: error.message });
+      if (error instanceof AppError) {
+        return reply.status(error.statusCode).send({ error: error.message });
+      } else {
+        return reply
+          .status(500)
+          .send({ error: "unknown error", details: String(error) });
       }
-      if (error instanceof UserAlreadyExistsError) {
-        return reply.status(409).send({ error: error.message });
-      }
-      return reply.status(500).send({ error: "Erro interno do servidor" });
     }
   }
 
+  /**
+   * Retorna os dados do usuário autenticado
+   * @param request - Requisição Fastify (usuário obtido do middleware de autenticação)
+   * @param reply - Resposta Fastify
+   * @returns Retorna dados do usuário atual
+   */
   async me(request: FastifyRequest, reply: FastifyReply) {
-    // O middleware de autenticação garante que request.user existe
-    const user = request.user;
-    return reply.status(200).send({
-      data: user,
-    });
+    try {
+      // O middleware de autenticação garante que request.user existe
+      const user = request.user;
+      return reply.status(200).send({
+        data: user,
+      });
+    } catch (error) {
+      if (error instanceof AppError) {
+        return reply.status(error.statusCode).send({ error: error.message });
+      } else {
+        return reply
+          .status(500)
+          .send({ error: "unknown error", details: String(error) });
+      }
+    }
   }
 }

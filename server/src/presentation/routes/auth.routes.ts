@@ -1,7 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { AuthController } from "../controllers/AuthController";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
-import { z } from "zod";
 import {
   LoginSchema,
   LoginResponseSchema,
@@ -12,13 +11,7 @@ import {
   RefreshTokenResponseSchema,
   RefreshTokenErrorResponseSchema,
 } from "@application/dtos/refresh.dto";
-
-// Helper para adicionar exemplos aos schemas Zod
-function withExamples<T extends z.ZodType<any>>(zodSchema: T, examples: any[]) {
-  const schemaWithExamples = zodSchema as T & { _examples?: any[] };
-  (schemaWithExamples as any)._examples = examples;
-  return schemaWithExamples;
-}
+import { withExamples } from "../utils";
 
 export async function authRoutes(app: FastifyInstance) {
   const authController = new AuthController();
