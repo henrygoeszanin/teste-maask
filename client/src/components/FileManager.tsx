@@ -7,6 +7,7 @@ import {
   updateFile,
   deleteFile
 } from '../services/api';
+import type { FileMetadata } from '../services/api';
 import {
   importCriptographyCode,
   encryptWithAES,
@@ -14,13 +15,6 @@ import {
   generateIV,
 } from '../utils/crypto';
 import { getCriptographyCode } from '../utils/storage';
-
-interface FileMetadata {
-  fileId: string;
-  fileName: string;
-  sizeBytes: number;
-  createdAt: string;
-}
 
 export default function FileManager() {
   const [files, setFiles] = useState<FileMetadata[]>([]);
@@ -303,7 +297,11 @@ export default function FileManager() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('pt-BR');
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return '-';
+    }
+    return date.toLocaleString('pt-BR');
   };
 
   return (
@@ -363,7 +361,9 @@ export default function FileManager() {
                   <div style={styles.fileDetails}>
                     <span>{formatBytes(file.sizeBytes)}</span>
                     <span style={styles.separator}>•</span>
-                    <span>{formatDate(file.createdAt)}</span>
+                    <span>Criado: {formatDate(file.createdAt)}</span>
+                    <span style={styles.separator}>•</span>
+                    <span>Atualizado: {formatDate(file.updatedAt)}</span>
                   </div>
                 </div>
                 <div style={styles.fileActions}>

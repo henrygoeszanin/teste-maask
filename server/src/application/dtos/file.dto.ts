@@ -87,6 +87,7 @@ export const ListFilesResponseSchema = z.object({
         fileName: z.string(),
         sizeBytes: z.number(),
         createdAt: z.string(),
+        updatedAt: z.string(),
       })
     ),
     total: z.number(),
@@ -129,6 +130,7 @@ export const UpdateFileResponseSchema = z.object({
     fileId: z.string(),
     presignedUrl: z.string(),
     expiresIn: z.number(),
+    updatedAt: z.string(),
   }),
 });
 

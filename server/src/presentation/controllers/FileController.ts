@@ -171,6 +171,7 @@ export class FileController {
             fileName: file.fileName,
             sizeBytes: file.sizeBytes,
             createdAt: file.createdAt.toISOString(),
+            updatedAt: file.updatedAt.toISOString(),
           })),
           total: result.total,
           page: result.page,
@@ -216,7 +217,13 @@ export class FileController {
       });
 
       return reply.status(200).send({
-        data: result,
+        data: {
+          uploadId: result.uploadId,
+          fileId: result.fileId,
+          presignedUrl: result.presignedUrl,
+          expiresIn: result.expiresIn,
+          updatedAt: result.updatedAt.toISOString(),
+        },
       });
     } catch (error) {
       if (error instanceof AppError) {

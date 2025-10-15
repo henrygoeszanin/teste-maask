@@ -11,6 +11,7 @@ export interface FileMetadata {
   fileName: string;
   sizeBytes: number;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface ListFilesOutput {
@@ -35,6 +36,7 @@ export class ListFilesUseCase {
       fileName: file.fileName,
       sizeBytes: file.sizeBytes,
       createdAt: file.createdAt,
+      updatedAt: file.updatedAt,
     }));
 
     return {

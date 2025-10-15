@@ -363,6 +363,7 @@ export interface FileMetadata {
   fileName: string;
   sizeBytes: number;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface ListFilesResponse {

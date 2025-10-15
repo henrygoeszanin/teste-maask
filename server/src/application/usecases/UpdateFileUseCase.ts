@@ -15,6 +15,7 @@ export interface UpdateFileOutput {
   fileId: string;
   presignedUrl: string;
   expiresIn: number;
+  updatedAt: Date;
 }
 
 /**
@@ -41,6 +42,11 @@ export class UpdateFileUseCase {
       throw new AppError("Unauthorized to update this file", 403);
     }
 
+    // Atualiza o updatedAt do arquivo no banco
+    const updatedAt = new Date();
+    existingFile.updatedAt = updatedAt;
+    await this.fileRepository.update(existingFile);
+
     // Gera novo uploadId para a atualização
     const uploadId = ulid();
 
@@ -58,6 +64,7 @@ export class UpdateFileUseCase {
       fileId,
       presignedUrl,
       expiresIn: 7200, // Supabase define 2 horas de expiração
+      updatedAt,
     };
   }
 }
