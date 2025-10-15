@@ -12,16 +12,21 @@ import {
   RefreshTokenErrorResponseSchema,
 } from "@application/dtos/refresh.dto";
 import { withExamples } from "../utils";
+import { authRateLimiter } from "../middlewares/rateLimiters";
 
-export async function authRoutes(app: FastifyInstance) {
+export function authRoutes(app: FastifyInstance) {
   const authController = new AuthController();
 
   app.withTypeProvider<ZodTypeProvider>().post(
     "/auth/login",
     {
+      config: {
+        rateLimit: authRateLimiter,
+      },
       schema: {
         tags: ["Auth"],
-        description: "Autenticar usuário e obter tokens JWT",
+        description:
+          "Autenticar usuário e obter tokens JWT (rate limit: 5 tentativas / 15 min)",
         body: withExamples(LoginSchema, [
           {
             email: "usuario@email.com",
@@ -44,6 +49,12 @@ export async function authRoutes(app: FastifyInstance) {
           ]),
           401: withExamples(AuthErrorResponseSchema, [
             { error: "Invalid username or password" },
+          ]),
+          429: withExamples(AuthErrorResponseSchema, [
+            {
+              error:
+                "Too many authentication attempts. Please try again later.",
+            },
           ]),
         },
       },

@@ -16,7 +16,7 @@ import {
 import { withExamples } from "../utils";
 import z from "zod";
 
-export async function deviceRoutes(
+export function deviceRoutes(
   app: FastifyInstance,
   options: { socketGateway: SocketGateway }
 ) {

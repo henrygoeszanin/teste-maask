@@ -5,6 +5,7 @@ import { SocketGateway } from "@presentation/gateways/SocketGateway";
 import swagger from "@fastify/swagger";
 import swaggerUI from "@fastify/swagger-ui";
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import {
   serializerCompiler,
   validatorCompiler,
@@ -28,7 +29,48 @@ app.register(cors, {
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
 });
 
-// Swagger/OpenAPI configuration
+// Rate Limiting configuration
+app.register(rateLimit, {
+  global: true, // Aplica globalmente a todas as rotas
+  max: config.rateLimit.global.max, // 100 requisições
+  timeWindow: config.rateLimit.global.timeWindow, // 15 minutos
+  cache: 10000, // Máximo de clientes a rastrear no cache
+  allowList: ["127.0.0.1"], // IPs permitidos sem rate limit (localhost)
+  nameSpace: "maask-rate-limit-", // Namespace para as chaves
+  continueExceeding: false, // Reseta o contador após atingir o limite
+  keyGenerator: (request) => {
+    // Usa IP do cliente como chave
+    const forwarded = request.headers["x-forwarded-for"];
+    const realIp = request.headers["x-real-ip"];
+
+    if (typeof forwarded === "string") {
+      return forwarded.split(",")[0].trim();
+    }
+    if (typeof realIp === "string") {
+      return realIp;
+    }
+    return request.ip || "unknown";
+  },
+  errorResponseBuilder: (request, context) => {
+    return {
+      error: "Too many requests, please try again later.",
+      statusCode: 429,
+      retryAfter: context.after,
+    };
+  },
+  enableDraftSpec: true, // Adiciona headers RateLimit-* (draft IETF spec)
+  addHeadersOnExceeding: {
+    "x-ratelimit-limit": true,
+    "x-ratelimit-remaining": true,
+    "x-ratelimit-reset": true,
+  },
+  addHeaders: {
+    "x-ratelimit-limit": true,
+    "x-ratelimit-remaining": true,
+    "x-ratelimit-reset": true,
+    "retry-after": true,
+  },
+}); // Swagger/OpenAPI configuration
 app.register(swagger, {
   openapi: {
     info: {
@@ -115,7 +157,7 @@ console.info("✅ Socket.IO Gateway inicializado");
 const start = async () => {
   try {
     // Register routes (passa socketGateway para as rotas)
-    await registerRoutes(app, socketGateway);
+    registerRoutes(app, socketGateway);
 
     await app.listen({
       port: config.server.port,

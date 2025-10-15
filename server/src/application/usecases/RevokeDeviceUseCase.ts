@@ -88,18 +88,11 @@ export class RevokeDeviceUseCase {
     }
 
     // 5. Executa revogação
-    console.log(
-      `[RevokeDevice] Starting revocation of device ${deviceNameToRevoke}`
-    );
 
     try {
       // Marca dispositivo como revogado
       deviceToRevoke.revoke();
       await this.deviceRepository.update(deviceToRevoke);
-
-      console.log(
-        `[RevokeDevice] Device ${deviceNameToRevoke} revoked successfully`
-      );
 
       // TODO: Registrar log de auditoria
       // await this.auditLogRepository.create({

@@ -38,4 +38,27 @@ export const config = {
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
     storageBucket: process.env.SUPABASE_STORAGE_BUCKET || "user-data",
   },
+  rateLimit: {
+    global: {
+      max: parseInt(process.env.RATE_LIMIT_GLOBAL_MAX || "100", 10), // 100 requisições
+      timeWindow: parseInt(
+        process.env.RATE_LIMIT_GLOBAL_TIME_WINDOW || "900000",
+        10
+      ), // 15 minutos em ms
+    },
+    auth: {
+      max: parseInt(process.env.RATE_LIMIT_AUTH_MAX || "5", 10), // 5 tentativas
+      timeWindow: parseInt(
+        process.env.RATE_LIMIT_AUTH_TIME_WINDOW || "900000",
+        10
+      ), // 15 minutos em ms
+    },
+    upload: {
+      max: parseInt(process.env.RATE_LIMIT_UPLOAD_MAX || "10", 10), // 10 uploads
+      timeWindow: parseInt(
+        process.env.RATE_LIMIT_UPLOAD_TIME_WINDOW || "3600000",
+        10
+      ), // 1 hora em ms
+    },
+  },
 } as const;

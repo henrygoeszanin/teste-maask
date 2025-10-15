@@ -22,7 +22,10 @@ export class DeviceController {
    */
   async register(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = request.user?.id!;
+      if (!request.user || !request.user.id) {
+        return reply.status(401).send({ error: "User not authenticated" });
+      }
+      const userId = request.user.id;
       const { deviceName } = request.body as RegisterDeviceDTO;
 
       const deviceRepository = new DeviceRepository();
@@ -58,7 +61,12 @@ export class DeviceController {
    */
   async list(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = request.user?.id!;
+      if (!request.user || !request.user.id) {
+        return reply
+          .status(401)
+          .send({ error: "Unauthorized: user not authenticated" });
+      }
+      const userId = request.user.id;
 
       const deviceRepository = new DeviceRepository();
       const devices = await deviceRepository.findByUserId(userId);
@@ -91,7 +99,12 @@ export class DeviceController {
    */
   async getById(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = request.user?.id!;
+      if (!request.user || !request.user.id) {
+        return reply
+          .status(401)
+          .send({ error: "Unauthorized: user not authenticated" });
+      }
+      const userId = request.user.id;
       const { id } = request.params as { id: string };
 
       const deviceRepository = new DeviceRepository();
@@ -206,7 +219,12 @@ export class DeviceController {
    */
   async delete(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = request.user?.id!;
+      if (!request.user || !request.user.id) {
+        return reply
+          .status(401)
+          .send({ error: "Unauthorized: user not authenticated" });
+      }
+      const userId = request.user.id;
       const { deviceId } = request.params as DeleteDeviceParamDTO;
 
       const deviceRepository = new DeviceRepository();

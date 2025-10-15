@@ -25,7 +25,12 @@ export class FileController {
    */
   static async initUpload(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = request.user?.id!;
+      if (!request.user || !request.user.id) {
+        return reply
+          .status(401)
+          .send({ error: "Unauthorized: user not authenticated" });
+      }
+      const userId = request.user.id;
       const { fileName, fileSize, mimeType } = request.body as InitUploadDTO;
 
       const storageService = new SupabaseStorageService();
@@ -67,7 +72,12 @@ export class FileController {
    */
   static async completeUpload(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = request.user?.id!;
+      if (!request.user || !request.user.id) {
+        return reply
+          .status(401)
+          .send({ error: "Unauthorized: user not authenticated" });
+      }
+      const userId = request.user.id;
       const { uploadId, fileId, fileName, fileSize } =
         request.body as CompleteUploadDTO;
 
@@ -115,7 +125,12 @@ export class FileController {
    */
   static async download(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = request.user?.id!;
+      if (!request.user || !request.user.id) {
+        return reply
+          .status(401)
+          .send({ error: "Unauthorized: user not authenticated" });
+      }
+      const userId = request.user.id;
       const { fileId } = request.params as { fileId: string };
 
       const fileRepository = new FileRepository();
@@ -152,7 +167,12 @@ export class FileController {
    */
   static async list(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = request.user?.id!;
+      if (!request.user || !request.user.id) {
+        return reply
+          .status(401)
+          .send({ error: "Unauthorized: user not authenticated" });
+      }
+      const userId = request.user.id;
       const { page = 1, limit = 20 } = request.query as ListFilesQueryDTO;
 
       const fileRepository = new FileRepository();
@@ -198,7 +218,12 @@ export class FileController {
    */
   static async update(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = request.user?.id!;
+      if (!request.user || !request.user.id) {
+        return reply
+          .status(401)
+          .send({ error: "Unauthorized: user not authenticated" });
+      }
+      const userId = request.user.id;
       const { fileId } = request.params as { fileId: string };
       const { fileName, fileSize } = request.body as UpdateFileDTO;
 
@@ -245,7 +270,12 @@ export class FileController {
    */
   static async delete(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = request.user?.id!;
+      if (!request.user || !request.user.id) {
+        return reply
+          .status(401)
+          .send({ error: "Unauthorized: user not authenticated" });
+      }
+      const userId = request.user.id;
       const { fileId } = request.params as { fileId: string };
 
       const fileRepository = new FileRepository();

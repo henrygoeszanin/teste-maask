@@ -17,6 +17,7 @@ import {
   ErrorResponseSchema,
 } from "@application/dtos/file.dto";
 import { withExamples } from "../utils";
+import { uploadRateLimiter } from "../middlewares/rateLimiters";
 
 export function fileRoutes(app: FastifyInstance) {
   // Iniciar upload
@@ -24,10 +25,13 @@ export function fileRoutes(app: FastifyInstance) {
     "/files/upload/init",
     {
       preHandler: [authenticate],
+      config: {
+        rateLimit: uploadRateLimiter,
+      },
       schema: {
         tags: ["Files"],
         description:
-          "Inicia um upload de arquivo e retorna presigned URL para upload direto ao Supabase Storage (requer Bearer token)",
+          "Inicia um upload de arquivo e retorna presigned URL para upload direto ao Supabase Storage (requer Bearer token, rate limit: 10 uploads / hora)",
         body: withExamples(InitUploadSchema, [
           {
             fileName: "profile-browser.zip",
@@ -52,6 +56,9 @@ export function fileRoutes(app: FastifyInstance) {
           ]),
           401: withExamples(ErrorResponseSchema, [
             { error: "Token not provided" },
+          ]),
+          429: withExamples(ErrorResponseSchema, [
+            { error: "Upload limit exceeded. Please try again later." },
           ]),
         },
         security: [{ bearerAuth: [] }],

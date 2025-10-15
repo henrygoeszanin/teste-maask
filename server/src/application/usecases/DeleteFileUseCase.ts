@@ -41,7 +41,6 @@ export class DeleteFileUseCase {
     const storageKey = existingFile.storagePath;
     try {
       await this.storageService.deleteFile(storageKey);
-      console.log(`[DeleteFile] Arquivo removido do storage: ${storageKey}`);
     } catch (error) {
       console.error(
         `[DeleteFile] Erro ao remover do storage: ${error}. Continuando...`
@@ -51,8 +50,6 @@ export class DeleteFileUseCase {
 
     // Deleta do banco de dados
     await this.fileRepository.delete(existingFile.id);
-
-    console.log(`[DeleteFile] Arquivo deletado - FileId: ${fileId}`);
 
     return {
       fileId: existingFile.fileId,

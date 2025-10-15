@@ -19,25 +19,16 @@ export class RegisterDeviceUseCase {
     if (existingDevice) {
       // Se o dispositivo já existe e está revogado, reativa ele
       if (existingDevice.isRevoked()) {
-        console.log(
-          `[RegisterDevice] Reativando dispositivo revogado: ${input.deviceName}`
-        );
         existingDevice.activate();
         return await this.deviceRepository.update(existingDevice);
       }
 
       // Se já está ativo, retorna o existente
       if (existingDevice.isActive()) {
-        console.log(
-          `[RegisterDevice] Dispositivo já ativo: ${input.deviceName}`
-        );
         return existingDevice;
       }
 
       // Se está inativo, reativa
-      console.log(
-        `[RegisterDevice] Reativando dispositivo inativo: ${input.deviceName}`
-      );
       existingDevice.activate();
       return await this.deviceRepository.update(existingDevice);
     }

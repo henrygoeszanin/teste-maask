@@ -45,10 +45,6 @@ export class DeleteDeviceUseCase {
     // Deleta o dispositivo
     await this.deviceRepository.delete(device.id);
 
-    console.log(
-      `[DeleteDevice] Device ${device.deviceName} (${deviceId}) deleted by user ${userId}`
-    );
-
     return {
       deviceId: device.id,
       deviceName: device.deviceName,
