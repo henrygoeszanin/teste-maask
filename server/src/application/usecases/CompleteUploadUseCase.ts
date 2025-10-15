@@ -46,8 +46,10 @@ export class CompleteUploadUseCase {
 
     if (existingFile) {
       // Caso de ATUALIZAÇÃO - atualiza registro existente
-      console.log(`[CompleteUpload] Atualizando arquivo existente: ${input.fileId}`);
-      
+      console.log(
+        `[CompleteUpload] Atualizando arquivo existente: ${input.fileId}`
+      );
+
       existingFile.fileName = input.fileName;
       existingFile.sizeBytes = input.fileSize;
       existingFile.updatedAt = new Date();
@@ -64,7 +66,7 @@ export class CompleteUploadUseCase {
 
     // Caso de NOVO UPLOAD - cria novo registro
     console.log(`[CompleteUpload] Criando novo arquivo: ${input.fileId}`);
-    
+
     const file = File.create(
       input.userId,
       input.fileName,

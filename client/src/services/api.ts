@@ -31,10 +31,10 @@ async function fetchAPI<T>(
   };
 
   // Só adiciona Content-Type se não for DELETE ou GET sem body
-  const method = options.method?.toUpperCase() || 'GET';
+  const method = options.method?.toUpperCase() || "GET";
   const hasBody = options.body !== undefined && options.body !== null;
-  
-  if (hasBody && method !== 'DELETE') {
+
+  if (hasBody && method !== "DELETE") {
     headers["Content-Type"] = "application/json";
   }
 
