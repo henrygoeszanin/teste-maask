@@ -3,16 +3,20 @@ import { RevokeDeviceUseCase } from "@/application/usecases/RevokeDeviceUseCase"
 import { DeviceRepository } from "@/infrastructure/repositories/DeviceRepository";
 import { UserRepository } from "@/infrastructure/repositories/UserRepository";
 import { RevokeDeviceDTO } from "@/application/dtos/device.dto";
+import { SocketGateway } from "@/presentation/gateways/SocketGateway";
 
 export class DeviceRevocationController {
+  constructor(private socketGateway?: SocketGateway) {}
+
   /**
    * Revoga um dispositivo de forma segura.
    *
    * Proteções:
    * - Exige senha do usuário
    * - Dispositivo não pode revogar a si mesmo
+   * - Notifica dispositivo revogado via Socket.IO em tempo real
    */
-  static async revokeDevice(
+  async revokeDevice(
     request: FastifyRequest,
     reply: FastifyReply
   ): Promise<void> {
@@ -39,8 +43,19 @@ export class DeviceRevocationController {
         deviceNameToRevoke: body.deviceName,
         currentDeviceName,
         password: body.password,
-        reason: body.reason,
       });
+
+      // 🔥 NOTIFICA O DISPOSITIVO REVOGADO VIA SOCKET.IO
+      if (this.socketGateway) {
+        console.log(
+          `[DeviceRevocationController] Notificando dispositivo ${body.deviceName} via Socket.IO`
+        );
+        this.socketGateway.notifyDeviceRevoked(userId, body.deviceName);
+      } else {
+        console.warn(
+          "[DeviceRevocationController] SocketGateway não disponível - notificação em tempo real desabilitada"
+        );
+      }
 
       return reply.status(200).send({
         message: "Device revoked successfully",

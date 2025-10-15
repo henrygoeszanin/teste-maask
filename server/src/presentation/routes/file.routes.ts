@@ -12,6 +12,9 @@ import {
   ListFilesQuerySchema,
   ListFilesResponseSchema,
   FileIdParamSchema,
+  UpdateFileSchema,
+  UpdateFileResponseSchema,
+  DeleteFileResponseSchema,
   ErrorResponseSchema,
 } from "@application/dtos/file.dto";
 
@@ -207,5 +210,85 @@ export async function fileRoutes(app: FastifyInstance) {
       },
     },
     FileController.list
+  );
+
+  // Atualizar arquivo
+  app.withTypeProvider<ZodTypeProvider>().put(
+    "/files/:fileId",
+    {
+      preHandler: authenticate,
+      schema: {
+        tags: ["Files"],
+        description:
+          "Atualiza um arquivo existente retornando presigned URL para upload do novo conteúdo (requer Bearer token)",
+        params: FileIdParamSchema,
+        body: withExamples(UpdateFileSchema, [
+          {
+            fileName: "profile-browser-updated.zip",
+            fileSize: 157286400,
+          },
+        ]),
+        response: {
+          200: withExamples(UpdateFileResponseSchema, [
+            {
+              data: {
+                uploadId: "upload-uuid-789",
+                fileId: "file-uuid-456",
+                presignedUrl:
+                  "https://txuiaqcmkhttexzhijmp.supabase.co/storage/v1/object/upload/sign/user-data/...",
+                expiresIn: 3600,
+              },
+            },
+          ]),
+          400: withExamples(ErrorResponseSchema, [
+            { error: "Invalid request body" },
+          ]),
+          401: withExamples(ErrorResponseSchema, [
+            { error: "Token not provided" },
+          ]),
+          403: withExamples(ErrorResponseSchema, [
+            { error: "Unauthorized to update this file" },
+          ]),
+          404: withExamples(ErrorResponseSchema, [{ error: "File not found" }]),
+        },
+        security: [{ bearerAuth: [] }],
+      },
+    },
+    FileController.update
+  );
+
+  // Deletar arquivo
+  app.withTypeProvider<ZodTypeProvider>().delete(
+    "/files/:fileId",
+    {
+      preHandler: authenticate,
+      schema: {
+        tags: ["Files"],
+        description:
+          "Deleta um arquivo do storage e do banco de dados (requer Bearer token)",
+        params: FileIdParamSchema,
+        response: {
+          200: withExamples(DeleteFileResponseSchema, [
+            {
+              message: "Arquivo deletado com sucesso",
+              data: {
+                fileId: "file-uuid-456",
+                fileName: "profile-browser.zip",
+                deletedAt: "2025-10-14T12:05:00.000Z",
+              },
+            },
+          ]),
+          401: withExamples(ErrorResponseSchema, [
+            { error: "Token not provided" },
+          ]),
+          403: withExamples(ErrorResponseSchema, [
+            { error: "Unauthorized to delete this file" },
+          ]),
+          404: withExamples(ErrorResponseSchema, [{ error: "File not found" }]),
+        },
+        security: [{ bearerAuth: [] }],
+      },
+    },
+    FileController.delete
   );
 }

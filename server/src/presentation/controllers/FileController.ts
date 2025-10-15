@@ -3,12 +3,15 @@ import { InitUploadUseCase } from "@/application/usecases/InitUploadUseCase";
 import { CompleteUploadUseCase } from "@/application/usecases/CompleteUploadUseCase";
 import { DownloadFileUseCase } from "@/application/usecases/DownloadFileUseCase";
 import { ListFilesUseCase } from "@/application/usecases/ListFilesUseCase";
+import { UpdateFileUseCase } from "@/application/usecases/UpdateFileUseCase";
+import { DeleteFileUseCase } from "@/application/usecases/DeleteFileUseCase";
 import { FileRepository } from "@/infrastructure/repositories/FileRepository";
 import { SupabaseStorageService } from "@/infrastructure/external/SupabaseStorageService";
 import {
   InitUploadDTO,
   CompleteUploadDTO,
   ListFilesQueryDTO,
+  UpdateFileDTO,
 } from "@/application/dtos/file.dto";
 
 export class FileController {
@@ -128,6 +131,64 @@ export class FileController {
         total: result.total,
         page: result.page,
         limit: result.limit,
+      },
+    });
+  }
+
+  /**
+   * Atualiza um arquivo existente
+   * Retorna presigned URL para upload do novo conteúdo
+   */
+  static async update(request: FastifyRequest, reply: FastifyReply) {
+    const userId = request.user?.id!;
+    const { fileId } = request.params as { fileId: string };
+    const { fileName, fileSize } = request.body as UpdateFileDTO;
+
+    const fileRepository = new FileRepository();
+    const storageService = new SupabaseStorageService();
+    const updateFileUseCase = new UpdateFileUseCase(
+      fileRepository,
+      storageService
+    );
+
+    const result = await updateFileUseCase.execute({
+      userId,
+      fileId,
+      fileName,
+      fileSize,
+    });
+
+    return reply.status(200).send({
+      data: result,
+    });
+  }
+
+  /**
+   * Deleta um arquivo do usuário
+   * Remove do storage e do banco de dados
+   */
+  static async delete(request: FastifyRequest, reply: FastifyReply) {
+    const userId = request.user?.id!;
+    const { fileId } = request.params as { fileId: string };
+
+    const fileRepository = new FileRepository();
+    const storageService = new SupabaseStorageService();
+    const deleteFileUseCase = new DeleteFileUseCase(
+      fileRepository,
+      storageService
+    );
+
+    const result = await deleteFileUseCase.execute({
+      userId,
+      fileId,
+    });
+
+    return reply.status(200).send({
+      message: "Arquivo deletado com sucesso",
+      data: {
+        fileId: result.fileId,
+        fileName: result.fileName,
+        deletedAt: result.deletedAt.toISOString(),
       },
     });
   }

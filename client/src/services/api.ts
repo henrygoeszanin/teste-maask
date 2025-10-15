@@ -88,6 +88,8 @@ async function refreshAccessToken(): Promise<string> {
   refreshPromise = (async () => {
     try {
       const refreshToken = getRefreshToken();
+      const deviceName = getDeviceName();
+
       if (!refreshToken || refreshToken.length < 10) {
         console.error("[API] RefreshToken inválido ou ausente");
         throw new Error("No refresh token available");
@@ -98,6 +100,7 @@ async function refreshAccessToken(): Promise<string> {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(deviceName && { "X-Device-Name": deviceName }),
         },
         body: JSON.stringify({ refreshToken }),
       });
@@ -105,6 +108,26 @@ async function refreshAccessToken(): Promise<string> {
       if (!response.ok) {
         const text = await response.text();
         console.error("[API] Falha no refresh token:", response.status, text);
+
+        // Verificar se é erro de dispositivo revogado
+        if (response.status === 403) {
+          try {
+            const errorData = JSON.parse(text);
+            if (errorData.error === "DEVICE_REVOKED") {
+              console.error("[API] Dispositivo revogado durante refresh");
+              // Limpar storage e redirecionar
+              clearTokens();
+              alert(
+                "🚫 Seu dispositivo foi revogado.\n\nVocê será redirecionado para a tela de login."
+              );
+              window.location.href = "/?revoked=true";
+              throw new Error("DEVICE_REVOKED");
+            }
+          } catch {
+            // Se não conseguir parsear, continua com erro genérico
+          }
+        }
+
         throw new Error("Failed to refresh token");
       }
 
@@ -348,4 +371,47 @@ export async function getDownloadUrl(
   fileId: string
 ): Promise<DownloadFileResponse> {
   return fetchAPI<DownloadFileResponse>(`/files/${fileId}/download`);
+}
+
+// ==================== UPDATE FILE ====================
+
+export interface UpdateFileRequest {
+  fileName: string;
+  fileSize: number;
+}
+
+export interface UpdateFileResponse {
+  data: {
+    uploadId: string;
+    fileId: string;
+    presignedUrl: string;
+    expiresIn: number;
+  };
+}
+
+export async function updateFile(
+  fileId: string,
+  data: UpdateFileRequest
+): Promise<UpdateFileResponse> {
+  return fetchAPI<UpdateFileResponse>(`/files/${fileId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+// ==================== DELETE FILE ====================
+
+export interface DeleteFileResponse {
+  message: string;
+  data: {
+    fileId: string;
+    fileName: string;
+    deletedAt: string;
+  };
+}
+
+export async function deleteFile(fileId: string): Promise<DeleteFileResponse> {
+  return fetchAPI<DeleteFileResponse>(`/files/${fileId}`, {
+    method: "DELETE",
+  });
 }

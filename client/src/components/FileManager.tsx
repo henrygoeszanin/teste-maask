@@ -3,7 +3,9 @@ import {
   listFiles, 
   initUpload, 
   completeUpload, 
-  getDownloadUrl 
+  getDownloadUrl,
+  updateFile,
+  deleteFile
 } from '../services/api';
 import {
   importCriptographyCode,
@@ -188,6 +190,110 @@ export default function FileManager() {
     }
   };
 
+  const handleUpdate = async (fileId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!confirm(`Tem certeza que deseja atualizar este arquivo?\n\nO conteúdo anterior será substituído.`)) {
+      e.target.value = '';
+      return;
+    }
+
+    setMessage('');
+    setLoading(true);
+    setUploadProgress(0);
+
+    try {
+      // 1. Obter criptografyCode do usuário
+      const criptografiaCode = getCriptographyCode();
+      if (!criptografiaCode) {
+        throw new Error('CriptographyCode não encontrada. Faça login novamente.');
+      }
+
+      // 2. Iniciar atualização (recebe nova presigned URL)
+      setMessage(`🔄 Iniciando atualização de ${file.name}...`);
+      const updateResponse = await updateFile(fileId, {
+        fileName: file.name,
+        fileSize: file.size,
+      });
+      setUploadProgress(10);
+
+      // 3. Importar criptografyCode como chave AES
+      setMessage('🔑 Preparando criptografia...');
+      const cryptoKey = await importCriptographyCode(criptografiaCode);
+      setUploadProgress(20);
+
+      // 4. Ler e criptografar arquivo
+      setMessage('🔒 Criptografando arquivo...');
+      const fileBuffer = await file.arrayBuffer();
+      const iv = generateIV();
+      const { ciphertext } = await encryptWithAES(fileBuffer, cryptoKey, iv);
+      setUploadProgress(50);
+
+      // 5. Combinar IV + dados criptografados
+      const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+      combined.set(iv, 0);
+      combined.set(new Uint8Array(ciphertext), iv.length);
+
+      // 6. Upload para Supabase Storage
+      setMessage('☁️ Enviando arquivo atualizado...');
+      const uploadResponse = await fetch(updateResponse.data.presignedUrl, {
+        method: 'PUT',
+        body: combined,
+        headers: {
+          'Content-Type': 'application/octet-stream',
+        },
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Falha no upload para armazenamento');
+      }
+      setUploadProgress(80);
+
+      // 7. Completar upload (mesma lógica do upload normal)
+      setMessage('✔️ Finalizando atualização...');
+      await completeUpload({
+        uploadId: updateResponse.data.uploadId,
+        fileId: updateResponse.data.fileId,
+        fileName: file.name,
+        fileSize: file.size,
+      });
+      setUploadProgress(100);
+
+      setMessage(`✅ Arquivo atualizado com sucesso!`);
+      await loadFiles();
+
+      // Reset input
+      e.target.value = '';
+    } catch (error) {
+      setMessage(`❌ Erro na atualização: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+    } finally {
+      setLoading(false);
+      setTimeout(() => setUploadProgress(0), 2000);
+    }
+  };
+
+  const handleDelete = async (fileId: string, fileName: string) => {
+    if (!confirm(`Tem certeza que deseja excluir o arquivo "${fileName}"?\n\nEsta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    setMessage('');
+    setLoading(true);
+
+    try {
+      setMessage(`🗑️ Excluindo ${fileName}...`);
+      await deleteFile(fileId);
+      
+      setMessage(`✅ Arquivo "${fileName}" excluído com sucesso!`);
+      await loadFiles();
+    } catch (error) {
+      setMessage(`❌ Erro ao excluir: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -260,16 +366,44 @@ export default function FileManager() {
                     <span>{formatDate(file.createdAt)}</span>
                   </div>
                 </div>
-                <button
-                  onClick={() => handleDownload(file.fileId, file.fileName)}
-                  disabled={loading}
-                  style={{
-                    ...styles.downloadButton,
-                    ...(loading ? styles.downloadButtonDisabled : {})
-                  }}
-                >
-                  ⬇️ Download
-                </button>
+                <div style={styles.fileActions}>
+                  <button
+                    onClick={() => handleDownload(file.fileId, file.fileName)}
+                    disabled={loading}
+                    style={{
+                      ...styles.downloadButton,
+                      ...(loading ? styles.downloadButtonDisabled : {})
+                    }}
+                  >
+                    ⬇️ Download
+                  </button>
+                  <label
+                    htmlFor={`update-${file.fileId}`}
+                    style={{
+                      ...styles.updateButton,
+                      ...(loading ? styles.downloadButtonDisabled : {})
+                    }}
+                  >
+                    🔄 Atualizar
+                  </label>
+                  <input
+                    type="file"
+                    id={`update-${file.fileId}`}
+                    onChange={(e) => handleUpdate(file.fileId, e)}
+                    disabled={loading}
+                    style={{ display: 'none' }}
+                  />
+                  <button
+                    onClick={() => handleDelete(file.fileId, file.fileName)}
+                    disabled={loading}
+                    style={{
+                      ...styles.deleteButton,
+                      ...(loading ? styles.downloadButtonDisabled : {})
+                    }}
+                  >
+                    🗑️ Excluir
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -403,6 +537,10 @@ const styles: Record<string, React.CSSProperties> = {
   separator: {
     margin: '0 8px',
   },
+  fileActions: {
+    display: 'flex',
+    gap: '8px',
+  },
   downloadButton: {
     padding: '8px 16px',
     background: '#28a745',
@@ -412,7 +550,31 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: '600',
-    transition: 'opacity 0.3s',
+    transition: 'background 0.3s, opacity 0.3s',
+  },
+  updateButton: {
+    padding: '8px 16px',
+    background: '#007bff',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    transition: 'background 0.3s, opacity 0.3s',
+    display: 'inline-block',
+    textAlign: 'center',
+  },
+  deleteButton: {
+    padding: '8px 16px',
+    background: '#dc3545',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    transition: 'background 0.3s, opacity 0.3s',
   },
   downloadButtonDisabled: {
     opacity: 0.6,

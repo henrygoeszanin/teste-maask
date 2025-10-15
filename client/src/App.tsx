@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Auth from './components/Auth';
 import FileManager from './components/FileManager';
 import DeviceManager from './components/DeviceManager';
+import { socketService } from './services/socket';
 import {
   isAuthenticated,
   hasCriptographyCode,
@@ -17,20 +18,48 @@ function App() {
   const [activeTab, setActiveTab] = useState<DashboardTab>('files');
 
   useEffect(() => {
+    // Verificar parâmetro revoked na URL
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('revoked') === 'true') {
+      alert('🚫 Seu dispositivo foi revogado por outro dispositivo.\n\nFaça login novamente para continuar.');
+      clearAllStorage();
+      setScreen('auth');
+      return;
+    }
+
     // Determinar tela inicial: Auth ou Dashboard
     if (isAuthenticated() && hasCriptographyCode()) {
       setScreen('dashboard');
+      // Conectar Socket.IO quando autenticado
+      socketService.connect();
     } else {
       setScreen('auth');
     }
+
+    // Configurar ping periódico para manter conexão ativa
+    const pingInterval = setInterval(() => {
+      if (socketService.isConnected()) {
+        socketService.sendPing();
+      }
+    }, 30000); // Ping a cada 30 segundos
+
+    // Cleanup
+    return () => {
+      clearInterval(pingInterval);
+      socketService.disconnect();
+    };
   }, []);
 
   const handleAuthSuccess = () => {
     setScreen('dashboard');
+    // Conectar Socket.IO após login bem-sucedido
+    socketService.connect();
   };
 
   const handleLogout = () => {
     if (confirm('Tem certeza que deseja sair?')) {
+      // Desconectar Socket.IO antes de limpar storage
+      socketService.disconnect();
       clearAllStorage();
       setScreen('auth');
     }

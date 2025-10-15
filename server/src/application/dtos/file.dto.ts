@@ -104,6 +104,48 @@ export const FileIdParamSchema = z.object({
 
 export type FileIdParamDTO = z.infer<typeof FileIdParamSchema>;
 
+// Schema para atualizar arquivo
+export const UpdateFileSchema = z.object({
+  fileName: z
+    .string()
+    .min(1, "fileName é obrigatório")
+    .max(255, "fileName deve ter no máximo 255 caracteres"),
+  fileSize: z.coerce
+    .number()
+    .int()
+    .positive("fileSize deve ser positivo")
+    .max(
+      500 * 1024 * 1024,
+      "fileSize deve ser no máximo 500MB (524288000 bytes)"
+    ),
+});
+
+export type UpdateFileDTO = z.infer<typeof UpdateFileSchema>;
+
+// Schema de resposta da atualização
+export const UpdateFileResponseSchema = z.object({
+  data: z.object({
+    uploadId: z.string(),
+    fileId: z.string(),
+    presignedUrl: z.string(),
+    expiresIn: z.number(),
+  }),
+});
+
+export type UpdateFileResponseDTO = z.infer<typeof UpdateFileResponseSchema>;
+
+// Schema de resposta da exclusão
+export const DeleteFileResponseSchema = z.object({
+  message: z.string(),
+  data: z.object({
+    fileId: z.string(),
+    fileName: z.string(),
+    deletedAt: z.string(),
+  }),
+});
+
+export type DeleteFileResponseDTO = z.infer<typeof DeleteFileResponseSchema>;
+
 // Schema de erro
 export const ErrorResponseSchema = z.object({
   error: z.string(),

@@ -5,6 +5,7 @@ import { AppError } from "@/domain/errors/AppError";
 import argon2 from "argon2";
 import { config } from "@/config";
 import { Buffer } from "node:buffer";
+import crypto from "crypto";
 
 interface RevokeDeviceInput {
   userId: string; // ID do usuário autenticado
@@ -29,8 +30,7 @@ export class RevokeDeviceUseCase {
   ) {}
 
   async execute(input: RevokeDeviceInput): Promise<void> {
-    const { userId, deviceNameToRevoke, currentDeviceName, password, reason } =
-      input;
+    const { userId, deviceNameToRevoke, currentDeviceName, password } = input;
 
     // 1. ⚠️ VALIDAÇÃO CRÍTICA: Verifica senha do usuário
     const user = await this.userRepository.findById(userId);
@@ -39,10 +39,8 @@ export class RevokeDeviceUseCase {
       throw new NotFoundError("User not found");
     }
 
-    // Verifica senha com Argon2 (incluindo pepper)
-    const isPasswordValid = await argon2.verify(user.password, password, {
-      secret: Buffer.from(config.security.pepper),
-    });
+    const pre = this.preHash(password, config.security.pepper);
+    const isPasswordValid = await argon2.verify(user.password, pre);
 
     if (!isPasswordValid) {
       throw new AppError("Invalid password. Revocation denied.", 401);
@@ -120,5 +118,17 @@ export class RevokeDeviceUseCase {
       console.error(`[RevokeDevice] Error revoking device:`, error);
       throw new AppError("Failed to revoke device. Please try again.", 500);
     }
+  }
+
+  /**
+   * Pré-hash usando HMAC-SHA256 com pepper (evita limits de tamanho de senha
+   * e adiciona defesa em profundidade). Alternativa: passar pepper como secret
+   * ao argon2 se biblioteca suportar.
+   * faz um pré-hash da senha usando HMAC-SHA256 e um "pepper" (segredo global do servidor).
+   * Isso protege contra ataques mesmo se o banco de dados for comprometido.
+   */
+
+  private preHash(password: string, pepper: string): Buffer {
+    return crypto.createHmac("sha256", pepper).update(password).digest();
   }
 }

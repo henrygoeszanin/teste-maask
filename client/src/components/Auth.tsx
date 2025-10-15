@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { login, register, registerDevice } from '../services/api';
-import { saveTokens, saveUserEmail, saveDeviceName, saveCriptographyCode } from '../utils/storage';
+import { saveTokens, saveUserEmail, saveCriptographyCode, getOrCreateDeviceName } from '../utils/storage';
 
 interface AuthProps {
   onAuthSuccess: () => void;
@@ -37,10 +37,9 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
         saveCriptographyCode(response.criptografyCode);
         console.log('[Auth] criptografyCode salva com sucesso');
 
-        // Gerar nome único para o dispositivo
-        const deviceName = `Web-${navigator.platform}-${Date.now()}`;
-        saveDeviceName(deviceName);
-        console.log('[Auth] Device name gerado:', deviceName);
+        // Gerar nome único para o dispositivo (consistente por navegador)
+        const deviceName = getOrCreateDeviceName();
+        console.log('[Auth] Device name obtido:', deviceName);
 
         // Registrar dispositivo no backend
         console.log('[Auth] Registrando dispositivo no backend...');

@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import { config } from "@config/index";
 import { registerRoutes } from "@presentation/routes";
+import { SocketGateway } from "@presentation/gateways/SocketGateway";
 import swagger from "@fastify/swagger";
 import swaggerUI from "@fastify/swagger-ui";
 import cors from "@fastify/cors";
@@ -106,8 +107,12 @@ app.setErrorHandler((error, request, reply) => {
   });
 });
 
-// Register routes
-registerRoutes(app);
+// Inicializa Socket.IO Gateway
+const socketGateway = new SocketGateway(app);
+console.log("✅ Socket.IO Gateway inicializado");
+
+// Register routes (passa socketGateway para as rotas)
+registerRoutes(app, socketGateway);
 
 // Start server
 const start = async () => {

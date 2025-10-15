@@ -11,13 +11,36 @@ export class RegisterDeviceUseCase {
   constructor(private deviceRepository: IDeviceRepository) {}
 
   async execute(input: RegisterDeviceInput): Promise<Device> {
-    // Verifica se já existe um dispositivo com este deviceName
-    const existingDevice = await this.deviceRepository.findByDeviceName(
-      input.deviceName
+    // Verifica se o usuário já possui um dispositivo com este deviceName
+    const userDevices = await this.deviceRepository.findByUserId(input.userId);
+    const existingDevice = userDevices.find(
+      (device) => device.deviceName === input.deviceName
     );
 
     if (existingDevice) {
-      throw new AppError("Dispositivo já registrado com este deviceName", 409);
+      // Se o dispositivo já existe e está revogado, reativa ele
+      if (existingDevice.isRevoked()) {
+        console.log(
+          `[RegisterDevice] Reativando dispositivo revogado: ${input.deviceName}`
+        );
+        existingDevice.activate();
+        return await this.deviceRepository.update(existingDevice);
+      }
+
+      // Se já está ativo, retorna o existente
+      if (existingDevice.isActive()) {
+        console.log(
+          `[RegisterDevice] Dispositivo já ativo: ${input.deviceName}`
+        );
+        return existingDevice;
+      }
+
+      // Se está inativo, reativa
+      console.log(
+        `[RegisterDevice] Reativando dispositivo inativo: ${input.deviceName}`
+      );
+      existingDevice.activate();
+      return await this.deviceRepository.update(existingDevice);
     }
 
     // Cria nova entidade de dispositivo

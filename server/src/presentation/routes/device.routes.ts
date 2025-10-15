@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { DeviceController } from "@/presentation/controllers/DeviceController";
 import { DeviceRevocationController } from "@/presentation/controllers/DeviceRevocationController";
+import { SocketGateway } from "@/presentation/gateways/SocketGateway";
 import { authenticate } from "@/presentation/middlewares/authenticate";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
@@ -22,7 +23,15 @@ function withExamples<T extends z.ZodType<any>>(zodSchema: T, examples: any[]) {
   return schemaWithExamples;
 }
 
-export async function deviceRoutes(app: FastifyInstance) {
+export async function deviceRoutes(
+  app: FastifyInstance,
+  options: { socketGateway: SocketGateway }
+) {
+  const { socketGateway } = options;
+
+  // Instancia o controller de revogação com Socket.IO
+  const revocationController = new DeviceRevocationController(socketGateway);
+
   // Registrar novo dispositivo
   app.withTypeProvider<ZodTypeProvider>().post(
     "/devices",
@@ -182,6 +191,6 @@ export async function deviceRoutes(app: FastifyInstance) {
         security: [{ bearerAuth: [] }],
       },
     },
-    DeviceRevocationController.revokeDevice
+    revocationController.revokeDevice.bind(revocationController)
   );
 }

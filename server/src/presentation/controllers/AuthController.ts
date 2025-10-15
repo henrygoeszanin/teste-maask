@@ -26,11 +26,26 @@ export class AuthController {
 
   async refresh(request: FastifyRequest, reply: FastifyReply) {
     const { refreshToken } = request.body as RefreshTokenDTO;
+    const deviceName = request.headers["x-device-name"] as string;
+
     try {
-      const result = await this.refreshTokenUseCase.execute({ refreshToken });
+      const result = await this.refreshTokenUseCase.execute(
+        { refreshToken },
+        deviceName
+      );
       return reply.status(200).send(result);
     } catch (error) {
-      return reply.status(401).send({ error: (error as Error).message });
+      const err = error as Error;
+
+      // Tratamento específico para dispositivo revogado
+      if (err.message === "DEVICE_REVOKED") {
+        return reply.status(403).send({
+          error: "DEVICE_REVOKED",
+          message: "Este dispositivo foi revogado. Faça login novamente.",
+        });
+      }
+
+      return reply.status(401).send({ error: err.message });
     }
   }
 }

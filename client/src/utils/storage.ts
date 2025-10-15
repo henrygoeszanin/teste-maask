@@ -81,6 +81,68 @@ export function clearDeviceName() {
   console.log("[Storage] deviceName removido");
 }
 
+/**
+ * Gera ou recupera um nome de dispositivo consistente baseado em características do navegador
+ * Isso garante que o mesmo navegador seja identificado como o mesmo dispositivo
+ */
+export function getOrCreateDeviceName(): string {
+  // Verifica se já existe um deviceName salvo
+  const existingDeviceName = getDeviceName();
+  if (existingDeviceName) {
+    return existingDeviceName;
+  }
+
+  // Gera fingerprint baseado em características do navegador
+  const fingerprint = generateDeviceFingerprint();
+
+  // Cria um nome amigável baseado no fingerprint
+  const deviceName = `Web-${fingerprint.substring(0, 8)}`;
+
+  // Salva para persistência
+  saveDeviceName(deviceName);
+
+  console.log("[Storage] Novo deviceName gerado:", deviceName);
+  return deviceName;
+}
+
+/**
+ * Gera um fingerprint único baseado em características do navegador
+ * Isso cria um identificador consistente para o mesmo dispositivo/navegador
+ */
+function generateDeviceFingerprint(): string {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  ctx?.fillText("fingerprint", 10, 10);
+
+  const data = {
+    userAgent: navigator.userAgent,
+    language: navigator.language,
+    platform: navigator.platform,
+    screenResolution: `${screen.width}x${screen.height}`,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    canvasFingerprint: canvas.toDataURL(),
+    cookieEnabled: navigator.cookieEnabled,
+    doNotTrack: navigator.doNotTrack,
+  };
+
+  // Converte para string e gera hash
+  const dataString = JSON.stringify(data);
+  return simpleHash(dataString);
+}
+
+/**
+ * Hash simples para gerar identificador consistente
+ */
+function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Converte para 32-bit
+  }
+  return Math.abs(hash).toString(16);
+}
+
 // ==================== CRIPTOGRAPHY CODE STATUS ====================
 
 export function hasCriptographyCode(): boolean {

@@ -2,31 +2,49 @@ import { RefreshTokenDTO } from "../dtos/refresh.dto";
 import { config } from "@/config";
 import jwt from "jsonwebtoken";
 import { IUserRepository } from "../interfaces/IUserRepository";
+import { IDeviceRepository } from "../interfaces/IDeviceRepository";
 import { UserRepository } from "@/infrastructure/repositories/UserRepository";
+import { DeviceRepository } from "@/infrastructure/repositories/DeviceRepository";
 
 export class RefreshTokenUseCase {
   constructor(
-    private readonly userRepo: IUserRepository = new UserRepository()
+    private readonly userRepo: IUserRepository = new UserRepository(),
+    private readonly deviceRepo: IDeviceRepository = new DeviceRepository()
   ) {}
 
-  async execute(data: RefreshTokenDTO) {
+  async execute(data: RefreshTokenDTO, deviceName?: string) {
     try {
       const decoded = jwt.verify(
         data.refreshToken,
         config.auth.jwtRefreshSecret
       ) as { sub: string };
+
       const user = await this.userRepo.findById(decoded.sub);
       if (!user) throw new Error("Usuário não encontrado");
+
+      // Se deviceName foi fornecido, validar se o dispositivo está ativo
+      if (deviceName) {
+        const devices = await this.deviceRepo.findByUserId(user.id, "active");
+        const device = devices.find((d) => d.deviceName === deviceName);
+        if (!device) {
+          throw new Error("DEVICE_REVOKED");
+        }
+      }
+
       const payload = { sub: user.id, email: user.email, name: user.name };
       const expiresIn = config.auth.accessTokenExpiresIn;
       const accessToken = jwt.sign(payload, config.auth.jwtSecret, {
         expiresIn,
       });
+
       return {
         accessToken,
         expiresIn,
       };
     } catch (error) {
+      if (error instanceof Error && error.message === "DEVICE_REVOKED") {
+        throw error; // Re-throw para tratamento específico no controller
+      }
       throw new Error("Refresh token inválido ou expirado");
     }
   }

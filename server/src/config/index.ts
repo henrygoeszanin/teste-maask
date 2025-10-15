@@ -1,6 +1,9 @@
 import "dotenv/config";
 
 export const config = {
+  cors: {
+    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+  },
   server: {
     port: parseInt(process.env.PORT || "3000", 10),
     host: process.env.HOST || "localhost",
