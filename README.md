@@ -12,7 +12,7 @@ Sistema para gerenciamento seguro de perfis de navegador.
 ```bash
 # 1. Configure as variáveis de ambiente
 cp server/.env.example server/.env.docker
-# Edite server/.env.docker com suas credenciais
+# Edite server/.env.docker com as credenciais enviadas via Whatsapp
 
 # 2. Suba os containers
 docker-compose up -d

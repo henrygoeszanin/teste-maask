@@ -388,7 +388,6 @@ export interface DownloadFileResponse {
     fileName: string;
     presignedUrl: string;
     expiresIn: number;
-    // Removidos: encryptedFek, fekEncryptionMetadata, fileEncryptionMetadata
   };
 }
 

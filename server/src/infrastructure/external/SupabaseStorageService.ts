@@ -104,31 +104,32 @@ export class SupabaseStorageService {
    * Obtém metadados de um arquivo
    * @param path - Caminho do arquivo no bucket
    * @returns Metadados do arquivo
+   * *Os metadados sao salvos no upload no banco de dados para facilitar o acesso
    */
-  async getFileMetadata(path: string): Promise<{
-    size?: number;
-    lastModified?: Date;
-    contentType?: string;
-  }> {
-    const { data, error } = await this.client.storage
-      .from(this.bucket)
-      .list(this.getDirectoryPath(path), {
-        search: this.getFileName(path),
-      });
+  // async getFileMetadata(path: string): Promise<{
+  //   size?: number;
+  //   lastModified?: Date;
+  //   contentType?: string;
+  // }> {
+  //   const { data, error } = await this.client.storage
+  //     .from(this.bucket)
+  //     .list(this.getDirectoryPath(path), {
+  //       search: this.getFileName(path),
+  //     });
 
-    if (error || !data || data.length === 0) {
-      throw new AppError("File not found");
-    }
+  //   if (error || !data || data.length === 0) {
+  //     throw new AppError("File not found");
+  //   }
 
-    const fileInfo = data[0];
-    return {
-      size: fileInfo.metadata?.size,
-      lastModified: fileInfo.updated_at
-        ? new Date(fileInfo.updated_at)
-        : undefined,
-      contentType: fileInfo.metadata?.mimetype,
-    };
-  }
+  //   const fileInfo = data[0];
+  //   return {
+  //     size: fileInfo.metadata?.size,
+  //     lastModified: fileInfo.updated_at
+  //       ? new Date(fileInfo.updated_at)
+  //       : undefined,
+  //     contentType: fileInfo.metadata?.mimetype,
+  //   };
+  // }
 
   /**
    * Gera uma URL assinada para upload direto ao Supabase Storage

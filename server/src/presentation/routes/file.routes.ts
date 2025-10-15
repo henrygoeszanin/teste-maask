@@ -75,12 +75,6 @@ export function fileRoutes(app: FastifyInstance) {
             fileId: "file-uuid-456",
             fileName: "profile-browser.zip",
             fileSize: 104857600,
-            encryptedFek: "encrypted-fek-base64-content",
-            encryptionMetadata: {
-              algorithm: "AES-256-GCM",
-              iv: "iv-base64",
-              authTag: "auth-tag-base64",
-            },
           },
         ]),
         response: {
@@ -129,17 +123,6 @@ export function fileRoutes(app: FastifyInstance) {
                 fileName: "profile-browser.zip",
                 presignedUrl:
                   "https://txuiaqcmkhttexzhijmp.supabase.co/storage/v1/object/sign/user-data/...",
-                encryptedFek: "encrypted-fek-base64-content",
-                fekEncryptionMetadata: {
-                  algorithm: "AES-256-GCM",
-                  iv: "fek-iv-base64",
-                  authTag: "fek-auth-tag-base64",
-                },
-                fileEncryptionMetadata: {
-                  algorithm: "AES-256-GCM",
-                  iv: "file-iv-base64",
-                  authTag: "file-auth-tag-base64",
-                },
                 expiresIn: 3600,
               },
             },

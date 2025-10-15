@@ -1,13 +1,5 @@
-// files (arquivo cifrado no storage; servidor guarda metadata + FEK cifrado por MDK)
-
 import { ulid } from "ulid";
 import { randomUUID } from "crypto";
-
-export interface EncryptionMetadata {
-  algorithm: string;
-  iv: string;
-  authTag: string;
-}
 
 export class File {
   constructor(
