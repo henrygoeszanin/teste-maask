@@ -230,7 +230,7 @@ O Launcher da Maask precisa abrir/fechar perfis de navegador de forma segura e r
 - Notificações por email/SMS ao registrar novo dispositivo
 - Registro de novo dispositivo no login, usando identificadior único (mac address ou similar)
 
-# Mlhoria de identificaão de devices - Device attestation — identidade baseada em chave (TPM + fallback DPAPI)
+# Melhoria de identificaão de devices - Device attestation — identidade baseada em chave (TPM + fallback DPAPI)
 
 Resumo: no primeiro run o cliente gera um par de chaves ECDSA/Ed25519 não-exportable no TPM (ou, se não houver TPM, protege a chave com DPAPI e Windows Certificate Store). O cliente prova posse assinando um nonce enviado pelo servidor; o servidor armazena o publicKey (ou apenas seu fingerprint) e grava deviceId = SHA256(publicKey). Para operações sensíveis (ex.: geração de presigned URLs) o servidor exige prova de posse (challenge-response) ou mTLS. Revogação é feita removendo o publicKey/certificate e notificando via Socket.IO.
 
@@ -512,15 +512,15 @@ src/
 
 ## 📈 Comparação: Requisitos vs. Implementação
 
-| Requisito Obrigatório     | Status  | Implementação                                 |
-| ------------------------- | ------- | --------------------------------------------- |
-| **Upload autenticado**    | ✅ 100% | Presigned URLs + JWT + Device ID              |
-| **Download performático** | ✅ 100% | Presigned URLs (< 1s para gerar)              |
-| **Metadados**             | ✅ 100% | 5 campos + timestamps                         |
-| **Criptografia**          | ✅ 100% | AES-256 + Argon2 + HTTPS                      |
-| **Performance**           | ✅ 100% | 100-300ms (geração URL) / 50 - 200 ms (login) |
-| **Documentação**          | ✅ 100% | Swagger + Markdown                            |
-| **Instruções setup**      | ✅ 100% | Docker Compose + README                       |
+| Requisito Obrigatório     | Implementação                                 |
+| ------------------------- | --------------------------------------------- |
+| **Upload autenticado**    | Presigned URLs + JWT + Device ID              |
+| **Download performático** | Presigned URLs (< 1s para gerar)              |
+| **Metadados**             | 5 campos + timestamps                         |
+| **Criptografia**          | AES-256 + Argon2 + HTTPS                      |
+| **Performance**           | 100-300ms (geração URL) / 50 - 200 ms (login) |
+| **Documentação**          | Swagger + Markdown                            |
+| **Instruções setup**      | Docker Compose + README                       |
 
 ---
 

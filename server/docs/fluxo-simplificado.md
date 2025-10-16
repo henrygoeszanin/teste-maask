@@ -35,10 +35,12 @@ Supabase Storage - Arquivos criptografados
    - Armazenada criptografada no banco de dados
    - Retornada para o cliente após autenticação
    - Usada para criptografar/descriptografar todos os arquivos do usuário
+   - Nunca transmitida em texto puro (sempre via HTTPS)
+   - Nunca deve ser armazenada em disco, apenas em memória volatil do cliente
 
 2. **Dispositivos** - Identificadores simples
 
-   - Cada dispositivo tem um `deviceName` único
+   - Cada dispositivo tem um `deviceId` único
    - Não há chaves públicas/privadas RSA
    - Controle de acesso baseado em status (active/inactive/revoked)
 
@@ -46,6 +48,7 @@ Supabase Storage - Arquivos criptografados
    - Cliente usa `criptografyCode` para criptografar arquivos antes do upload
    - Servidor armazena apenas metadados (nome, tamanho, caminho)
    - Cliente usa `criptografyCode` para descriptografar após download
+   - Se necessário é possivel buscar metadados no proprio supabase tambem, mas armezena-los no banco facilita buscas e tempo de resposta
 
 ---
 
@@ -263,7 +266,7 @@ user.routes.ts (GET /me)
 // No Cliente
 
 // Gera um nome único para o dispositivo
-const deviceName = `${navigator.platform}-${Date.now()}`;
+const deviceId = `${navigator.platform}-${Date.now()}`;
 // Exemplo: "Win32-1697289600000"
 
 const response = await fetch("/api/devices", {
@@ -273,7 +276,7 @@ const response = await fetch("/api/devices", {
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    deviceName: deviceName,
+    deviceId: deviceId,
   }),
 });
 
@@ -281,13 +284,13 @@ const device = await response.json();
 console.log("✅ Dispositivo registrado:", device);
 // {
 //   id: "01HX...",
-//   deviceName: "Win32-1697289600000",
+//   deviceId: "Win32-1697289600000",
 //   status: "active",
 //   createdAt: "2025-10-14T12:00:00Z"
 // }
 
-// Armazena deviceName localmente
-localStorage.setItem("deviceName", deviceName);
+// Armazena deviceId localmente
+localStorage.setItem("deviceId", deviceId);
 ```
 
 **Servidor processa:**
@@ -298,19 +301,19 @@ Headers: {
   "Authorization": "Bearer eyJhbGc..."
 }
 Body: {
-  "deviceName": "Win32-1697289600000"
+  "deviceId": "Win32-1697289600000"
 }
 
 API processa:
 1. Autentica usuário (JWT)
 2. Valida dados com Zod
-3. Verifica se deviceName já existe
+3. Verifica se deviceId já existe
 4. Cria entidade Device (status: active)
 5. Salva no banco
 
 Response: {
   id: "01HX...",
-  deviceName: "Win32-1697289600000",
+  deviceId: "Win32-1697289600000",
   status: "active",
   createdAt: "2025-10-14T12:00:00Z"
 }
@@ -324,7 +327,7 @@ device.routes.ts (POST /devices)
   → validateBody(RegisterDeviceSchema)
   → DeviceController.register()
     → RegisterDeviceUseCase.execute()
-      → DeviceRepository.findByDeviceName() // Verifica duplicata
+      → DeviceRepository.findBydeviceId() // Verifica duplicata
       → Device.create()
       → DeviceRepository.create()
         → PostgreSQL (devices table)
@@ -720,18 +723,18 @@ const response = await fetch("/api/devices", {
 const { devices } = await response.json();
 console.log("Dispositivos:", devices);
 // [
-//   { id: "1", deviceName: "Win32-1697289600000", status: "active" },
-//   { id: "2", deviceName: "iPhone-1697289700000", status: "active" },
+//   { id: "1", deviceId: "Win32-1697289600000", status: "active" },
+//   { id: "2", deviceId: "iPhone-1697289700000", status: "active" },
 // ]
 
 // 2. Usuário identifica dispositivo perdido
 const deviceToRevoke = devices.find((d) =>
-  d.deviceName.includes("iPhone-1697289700000")
+  d.deviceId.includes("iPhone-1697289700000")
 );
 
 // 3. Confirma revogação
 const confirmed = confirm(
-  `⚠️ ATENÇÃO: Revogar dispositivo ${deviceToRevoke.deviceName}?\n\n` +
+  `⚠️ ATENÇÃO: Revogar dispositivo ${deviceToRevoke.deviceId}?\n\n` +
     `Este dispositivo será marcado como "revoked" e perderá acesso à API.\n` +
     `Para restaurar o acesso, será necessário fazer login novamente.`
 );
@@ -742,17 +745,17 @@ if (!confirmed) {
 }
 
 // 4. Revoga o dispositivo
-const currentDeviceName = localStorage.getItem("deviceName");
+const currentdeviceId = localStorage.getItem("deviceId");
 
 const revokeResponse = await fetch("/api/devices/revoke", {
   method: "POST",
   headers: {
     Authorization: `Bearer ${accessToken}`,
-    "x-device-id": currentDeviceName, // Dispositivo que está revogando
+    "x-device-id": currentdeviceId, // Dispositivo que está revogando
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    deviceName: deviceToRevoke.deviceName,
+    deviceId: deviceToRevoke.deviceId,
     password: "Senha123!", // Senha obrigatória
     reason: "lost",
   }),
@@ -776,7 +779,7 @@ Headers: {
   "x-device-id": "Win32-1697289600000"
 }
 Body: {
-  "deviceName": "iPhone-1697289700000",
+  "deviceId": "iPhone-1697289700000",
   "password": "Senha123!",
   "reason": "lost"
 }
@@ -791,11 +794,12 @@ API processa:
 7. Verifica se não está tentando revogar a si mesmo
 8. Marca dispositivo como "revoked"
 9. Atualiza no banco
+10. Dispara evento websocket para notificar o dispositivo revogado (se online)
 
 Response: {
   message: "Device revoked successfully",
   data: {
-    deviceName: "iPhone-1697289700000",
+    deviceId: "iPhone-1697289700000",
     revokedAt: "2025-10-14T10:35:00Z"
   }
 }
@@ -811,8 +815,8 @@ device.routes.ts (POST /devices/revoke)
     → RevokeDeviceUseCase.execute()
       → UserRepository.findById() // Valida senha
       → Argon2.verify()
-      → DeviceRepository.findByDeviceName() // Dispositivo atual
-      → DeviceRepository.findByDeviceName() // Dispositivo alvo
+      → DeviceRepository.findBydeviceId() // Dispositivo atual
+      → DeviceRepository.findBydeviceId() // Dispositivo alvo
       → device.revoke() // Marca como revoked
       → DeviceRepository.update()
         → PostgreSQL (devices table)
@@ -950,7 +954,6 @@ Resultado:
 ### Recomendações de Segurança
 
 1. **Sempre use HTTPS** - Toda comunicação deve ser criptografada
-2. **Rotação de chaves** - Considere permitir que usuário regenere `criptografyCode`
+2. **Rotação de chaves** - Considere permitir que usuário gere uma nova `criptografy`
 3. **Auditoria** - Registre todos os acessos e ações sensíveis
-4. **Rate limiting** - Previna ataques de força bruta
-5. **Troca de senha** - Após revogar dispositivo, recomende troca de senha
+4. **Troca de senha** - Após revogar dispositivo, recomende troca de senha

@@ -193,6 +193,7 @@ VITE_API_URL=http://localhost:3000
 │   ├── src/
 │   │   ├── application/    # Use cases, DTOs, Services
 │   │   ├── domain/         # Entities, Business Logic
+│   │   ├── docs/           # Arquivos markdown de documentação
 │   │   ├── infrastructure/ # Database, External Services
 │   │   └── presentation/   # Controllers, Routes, Middlewares
 │   ├── drizzle/            # Database Migrations
