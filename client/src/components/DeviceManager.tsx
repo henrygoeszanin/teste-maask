@@ -149,13 +149,6 @@ export default function DeviceManager() {
         </p>
 
         <p style={styles.infoText}>
-          Nota: navegadores não expõem o endereço MAC por questões de privacidade. Para identificação única:
-          em aplicações web gere um deviceId (UUID) no primeiro acesso e armazene-o em localStorage; em
-          aplicações desktop nativas prefira um identificador do sistema (ex.: machine-id) ou um identificador
-          fornecido pelo launcher.
-        </p>
-
-        <p style={styles.infoText}>
           Para revogar um dispositivo, clique em <strong>"Revogar"</strong>.
           Esta ação bloqueia o acesso à API mas não remove arquivos já baixados.
         </p>
