@@ -24,7 +24,7 @@ app.setSerializerCompiler(serializerCompiler);
 
 // CORS configuration
 app.register(cors, {
-  origin: config.server.env === "development" ? "*" : config.cors.origin,
+  origin: config.server.env === "development" ? true : config.cors.origin,
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
 });
@@ -80,7 +80,7 @@ app.register(swagger, {
     },
     servers: [
       {
-        url: `http://${config.server.host}:${config.server.port}`,
+        url: `http://localhost:${config.server.port}`,
         description: "Development server",
       },
     ],
@@ -167,6 +167,12 @@ const start = async () => {
     console.info(
       `🚀 Server is running on http://${config.server.host}:${config.server.port}`
     );
+    console.info(`API em modo ${config.server.env}`);
+    if (config.server.env === "development") {
+      console.info(
+        `📚 Documentação disponível em http://${config.server.host}:${config.server.port}/docs`
+      );
+    }
   } catch (err) {
     app.log.error(err);
     process.exit(1);
