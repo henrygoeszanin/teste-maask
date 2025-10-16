@@ -25,14 +25,14 @@ export class LoginUseCase {
   async execute(data: LoginDTO): Promise<LoginResult> {
     const user = await this.userRepo.findByEmail(data.email);
     if (!user) {
-      throw new AppError("Usuário ou senha inválidos", 401);
+      throw new AppError("Invalid email or password", 401);
     }
 
     // Pré-hash igual ao cadastro
     const pre = this.preHash(data.password, config.security.pepper);
     const valid = await argon2.verify(user.password, pre);
     if (!valid) {
-      throw new AppError("Usuário ou senha inválidos", 401);
+      throw new AppError("Invalid email or password", 401);
     }
 
     // Gerar tokens JWT

@@ -21,7 +21,7 @@ export class RefreshTokenUseCase {
       ) as { sub: string };
 
       const user = await this.userRepo.findById(decoded.sub);
-      if (!user) throw new AppError("Usuário não encontrado", 404);
+      if (!user) throw new AppError("User not found", 404);
 
       // Se deviceId foi fornecido, validar se o dispositivo está ativo
       if (deviceId) {
@@ -44,9 +44,9 @@ export class RefreshTokenUseCase {
       };
     } catch (error) {
       if (error instanceof Error && error.message === "DEVICE_REVOKED") {
-        throw error; // Re-throw para tratamento específico no controller
+        throw error; // Re-throw for specific handling in the controller
       }
-      throw new Error("Refresh token inválido ou expirado");
+      throw new Error("Invalid or expired refresh token");
     }
   }
 }

@@ -190,6 +190,15 @@ O Launcher da Maask precisa abrir/fechar perfis de navegador de forma segura e r
 
 ---
 
+### Error Handling & Message Language
+
+- All server-side error messages must be in English. This includes both machine-readable error codes and human-readable messages returned in API responses.
+- Machine-readable error codes should follow UPPER_SNAKE_CASE (for example `DEVICE_REVOKED`, `TOKEN_EXPIRED`, `USER_NOT_FOUND`).
+- Human-readable messages should be concise and in English (for example `Authentication token has expired. Please login again.`).
+- See `server/docs/error-handling.md` for the full response contract and examples.
+
+---
+
 ### 7. ✅ Instruções para Rodar e Testar
 
 **Requisito:**

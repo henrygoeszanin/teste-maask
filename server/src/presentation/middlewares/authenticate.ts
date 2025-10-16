@@ -19,8 +19,8 @@ export async function authenticate(
 
     if (!authHeader) {
       return reply.status(401).send({
-        error: "Token não fornecido",
-        message: "É necessário fornecer um token de autenticação",
+        error: "Token not provided",
+        message: "Authentication token is required",
       });
     }
 
@@ -28,8 +28,8 @@ export async function authenticate(
 
     if (bearer !== "Bearer" || !token) {
       return reply.status(401).send({
-        error: "Formato de token inválido",
-        message: "O token deve ser fornecido no formato: Bearer <token>",
+        error: "Invalid token format",
+        message: "Token must be provided in the format: Bearer <token>",
       });
     }
 
@@ -44,21 +44,21 @@ export async function authenticate(
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
       return reply.status(401).send({
-        error: "Token expirado",
-        message: "O token de autenticação expirou. Faça login novamente.",
+        error: "Token expired",
+        message: "Authentication token has expired. Please login again.",
       });
     }
 
     if (error instanceof jwt.JsonWebTokenError) {
       return reply.status(401).send({
-        error: "Token inválido",
-        message: "O token de autenticação é inválido",
+        error: "Invalid token",
+        message: "Authentication token is invalid",
       });
     }
 
     return reply.status(401).send({
-      error: "Erro de autenticação",
-      message: "Não foi possível autenticar o usuário",
+      error: "Authentication error",
+      message: "Unable to authenticate user",
     });
   }
 }

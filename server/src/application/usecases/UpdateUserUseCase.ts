@@ -9,7 +9,7 @@ export class UpdateUserUseCase {
     // Verifica se o usuário existe
     const user = await this.userRepo.findById(userId);
     if (!user) {
-      throw new AppError("Usuário não encontrado", 404);
+      throw new AppError("User not found", 404);
     }
 
     // Atualiza apenas os campos fornecidos

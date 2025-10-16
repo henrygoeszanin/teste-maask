@@ -25,25 +25,19 @@ export class DownloadFileUseCase {
     const file = await this.fileRepository.findByFileId(input.fileId);
 
     if (!file) {
-      throw new AppError("Arquivo não encontrado", 404);
+      throw new AppError("File not found", 404);
     }
 
     // Verifica se o arquivo pertence ao usuário
     if (file.userId !== input.userId) {
-      throw new AppError(
-        "Você não tem permissão para acessar este arquivo",
-        403
-      );
+      throw new AppError("You do not have permission to access this file", 403);
     }
 
     // Verifica se o arquivo existe no Storage
     const fileExists = await this.storageService.fileExists(file.storagePath);
 
     if (!fileExists) {
-      throw new AppError(
-        "Arquivo não encontrado no storage. Pode ter sido deletado.",
-        404
-      );
+      throw new AppError("File not found in storage", 404);
     }
 
     // Gera presigned URL para download (válida por 1 hora)
