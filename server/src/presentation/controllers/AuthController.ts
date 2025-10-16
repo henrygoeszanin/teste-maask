@@ -39,17 +39,17 @@ export class AuthController {
 
   /**
    * Renova os tokens de acesso usando o refresh token
-   * @param request - Requisição Fastify contendo refreshToken no body e x-device-name no header
+   * @param request - Requisição Fastify contendo refreshToken no body e x-device-id no header
    * @param reply - Resposta Fastify
    * @returns Retorna novos tokens de acesso e refresh em caso de sucesso, erro 403 para dispositivo revogado, ou erro 401 para outros casos
    */
   async refresh(request: FastifyRequest, reply: FastifyReply) {
     const { refreshToken } = request.body as RefreshTokenDTO;
-    const deviceName = request.headers["x-device-name"] as string;
+    const deviceId = request.headers["x-device-id"] as string;
     try {
       const result = await this.refreshTokenUseCase.execute(
         { refreshToken },
-        deviceName
+        deviceId
       );
       return reply.status(200).send(result);
     } catch (error) {

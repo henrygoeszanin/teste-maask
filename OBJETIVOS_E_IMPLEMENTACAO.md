@@ -22,7 +22,7 @@ O Launcher da Maask precisa abrir/fechar perfis de navegador de forma segura e r
 - ✅ **Etapa 1**: `POST /api/v1/files/upload/init` → Gera URL pré-assinada (válida 2h)
 - ✅ **Etapa 2**: Cliente faz upload direto ao Supabase Storage (não passa pelo backend)
 - ✅ **Etapa 3**: `POST /api/v1/files/upload/complete` → Confirma e salva metadados
-- ✅ Autenticação via JWT (Access Token + Refresh Token)
+- ✅ Autenticação via JWT (Access Token + Refresh Token) -> Stateless
 - ✅ Validação de Device ID para controle de acesso
 - ✅ Backend nunca processa buffers grandes (apenas gera URLs)
 

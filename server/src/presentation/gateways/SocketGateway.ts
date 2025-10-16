@@ -1,11 +1,13 @@
 import { FastifyInstance } from "fastify";
 import { Server as SocketIOServer, Socket } from "socket.io";
+import { Socket as NetSocket } from "net";
 import jwt from "jsonwebtoken";
 import { config } from "@/config";
 
 export interface AuthenticatedSocket extends Socket {
   userId: string;
-  deviceName: string;
+  deviceId: string; // Obrigatório: deviceId recebido no handshake
+  deviceName?: string; // deviceName fica opcional
   email: string;
 }
 
@@ -26,8 +28,52 @@ export class SocketGateway {
       transports: ["websocket", "polling"],
     });
 
+    // Registra apenas handlers essenciais do servidor HTTP (somente erros)
+    try {
+      const httpServer = fastify.server as unknown as import("http").Server;
+      httpServer.on("clientError", (err: Error, _socket: NetSocket) => {
+        console.error("[SocketGateway] HTTP clientError:", err?.message || err);
+      });
+    } catch (e) {
+      // Não falhar se algum servidor customizado não expuser estes eventos
+      console.warn(
+        "[SocketGateway] Não foi possível registrar listeners HTTP:",
+        e
+      );
+    }
+
     this.setupMiddleware();
     this.setupEventHandlers();
+
+    // Escuta erros gerais do Socket.IO
+    try {
+      this.io.on("error", (err: Error) => {
+        console.error(
+          "[SocketGateway] Socket.IO error ->",
+          err?.message || err
+        );
+      });
+    } catch (e) {
+      console.warn(
+        "[SocketGateway] Falha ao anexar listener de erro do Socket.IO:",
+        e
+      );
+    }
+
+    // engine.io-level hooks: apenas erro é logado
+    try {
+      const engine = (this.io as any).engine;
+      if (engine) {
+        engine.on("error", (err: any) => {
+          console.error(
+            "[SocketGateway] engine.io error ->",
+            err?.message || err
+          );
+        });
+      }
+    } catch (e) {
+      console.warn("[SocketGateway] Falha ao anexar listeners engine.io:", e);
+    }
   }
 
   /**
@@ -37,17 +83,38 @@ export class SocketGateway {
   private setupMiddleware() {
     this.io.use((socket, next) => {
       try {
-        const { token, deviceName } = socket.handshake.auth as {
+        const handshake = socket.handshake as unknown as {
+          auth?: { token?: string; deviceId?: string; deviceName?: string };
+          headers?: Record<string, string | string[] | undefined>;
+          address?: string;
+        };
+
+        const { token, deviceId, deviceName } = (handshake.auth || {}) as {
           token?: string;
+          deviceId?: string;
           deviceName?: string;
         };
 
+        // Remote address do handshake quando disponível (não garante engine.conn)
+        const remoteAddress = handshake?.address ?? "unknown";
+        const headers = handshake?.headers ?? {};
+
         if (!token) {
+          console.warn("[SocketGateway] Rejeitando conexão: token ausente", {
+            remoteAddress,
+            deviceId,
+            origin: headers.origin || headers.referer,
+          });
           return next(new Error("Authentication token required"));
         }
 
-        if (!deviceName) {
-          return next(new Error("Device name required"));
+        // For security, deviceId must be provided in the handshake
+        if (!deviceId) {
+          console.warn("[SocketGateway] Rejeitando conexão: deviceId ausente", {
+            remoteAddress,
+            origin: headers.origin || headers.referer,
+          });
+          return next(new Error("Device ID required in handshake"));
         }
 
         // Valida JWT
@@ -60,16 +127,18 @@ export class SocketGateway {
         // Adiciona dados do usuário ao socket tipado
         const authSocket = socket as AuthenticatedSocket;
         authSocket.userId = decoded.sub;
-        authSocket.deviceName = deviceName;
+        authSocket.deviceId = deviceId; // Guarda o deviceId no socket (obrigatório)
+        authSocket.deviceName = deviceName; // deviceName opcional
         authSocket.email = decoded.email;
-
-        console.info(
-          `[SocketGateway] Cliente autenticado: ${decoded.email} (Device: ${deviceName})`
-        );
 
         next();
       } catch (error) {
-        console.error("[SocketGateway] Erro na autenticação:", error);
+        // Log detalhado de falhas de autenticação (permanece como error)
+        const e = error as Error;
+        console.error("[SocketGateway] Erro na autenticação ->", {
+          message: e?.message,
+          stack: e?.stack,
+        });
         next(new Error("Invalid authentication token"));
       }
     });
@@ -83,9 +152,22 @@ export class SocketGateway {
       const authSocket = socket as AuthenticatedSocket;
       const { userId, deviceName, email } = authSocket;
 
-      console.info(
-        `[SocketGateway] Nova conexão: ${email} (Device: ${deviceName})`
-      );
+      console.log("SocketGateway] Novo dispositivo conectado:", {
+        userId,
+        deviceName,
+        email,
+        socketId: socket.id,
+      });
+
+      // Resumo do handshake disponível no socket
+      const hs = socket.handshake as unknown as {
+        headers?: Record<string, string | string[] | undefined>;
+        address?: string;
+        query?: Record<string, string> | undefined;
+        auth?: Record<string, unknown> | undefined;
+        time?: string;
+      };
+      const remoteAddress = hs?.address ?? "unknown";
 
       // Entra na room do usuário (para broadcasts direcionados)
       void authSocket.join(userId);
@@ -95,10 +177,21 @@ export class SocketGateway {
         authSocket.emit("pong");
       });
 
+      // Tenta capturar erros no socket
+      authSocket.on("error", (err) => {
+        const maybeErr = err as unknown as { message?: string };
+        const errMsg = maybeErr?.message ?? String(err);
+        console.error(
+          `[SocketGateway] Socket error on ${socket.id} ->`,
+          errMsg
+        );
+      });
+
       // Desconexão
       authSocket.on("disconnect", (reason) => {
+        // Mantemos apenas um log informativo sobre desconexões
         console.info(
-          `[SocketGateway] Desconectado: ${email} (Device: ${deviceName}) - Razão: ${reason}`
+          `[SocketGateway] Disconnected: ${email} (Device: ${deviceName}) - Reason: ${reason} - socketId: ${socket.id} - remote: ${remoteAddress}`
         );
       });
     });
@@ -108,12 +201,19 @@ export class SocketGateway {
    * Notifica dispositivo específico sobre revogação
    * Emite evento para todos os sockets na room do usuário
    */
-  public notifyDeviceRevoked(userId: string, deviceName: string) {
+  public notifyDeviceRevoked(
+    userId: string,
+    deviceId: string,
+    deviceName?: string
+  ) {
     console.info(
-      `[SocketGateway] Notificando revogação: User ${userId}, Device ${deviceName}`
+      `[SocketGateway] Notificando revogação: User ${userId}, Device ${deviceId}${
+        deviceName ? ` (${deviceName})` : ""
+      }`
     );
 
     this.io.to(userId).emit("device-revoked", {
+      deviceId,
       deviceName,
       message:
         "Seu dispositivo foi revogado por outro dispositivo. Você será desconectado.",

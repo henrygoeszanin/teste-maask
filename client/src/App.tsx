@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Auth from './components/Auth';
 import FileManager from './components/FileManager';
 import DeviceManager from './components/DeviceManager';
@@ -16,11 +16,17 @@ type DashboardTab = 'files' | 'devices';
 function App() {
   const [screen, setScreen] = useState<Screen>('auth');
   const [activeTab, setActiveTab] = useState<DashboardTab>('files');
+  
+  // Ref para prevenir double-connect no React Strict Mode
+  const socketInitialized = useRef(false);
 
   useEffect(() => {
+    console.log('[App] 🚀 useEffect principal executado');
+    
     // Verificar parâmetro revoked na URL
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('revoked') === 'true') {
+      console.log('[App] ⚠️ Parâmetro revoked detectado na URL');
       alert('🚫 Seu dispositivo foi revogado por outro dispositivo.\n\nFaça login novamente para continuar.');
       clearAllStorage();
       setScreen('auth');
@@ -28,11 +34,33 @@ function App() {
     }
 
     // Determinar tela inicial: Auth ou Dashboard
-    if (isAuthenticated() && hasCriptographyCode()) {
+    const authenticated = isAuthenticated();
+    const hasCrypto = hasCriptographyCode();
+    console.log('[App] Estado de autenticação:', { authenticated, hasCrypto });
+
+    if (authenticated && hasCrypto) {
+      console.log('[App] ✅ Usuário autenticado, mudando para dashboard');
       setScreen('dashboard');
-      // Conectar Socket.IO quando autenticado
-      socketService.connect();
+      
+      // Conectar Socket.IO quando autenticado (apenas uma vez)
+      if (!socketInitialized.current) {
+        socketInitialized.current = true;
+        console.log('[App] 🔌 Iniciando conexão socket (primeira vez)...');
+        (async () => {
+          try {
+            console.log('[App] 🔄 Chamando socketService.connect()...');
+            await socketService.connect();
+            console.log('[App] ✅ Socket conectado com sucesso!');
+          } catch (err) {
+            console.error('[App] ❌ Falha ao conectar socket:', err);
+            socketInitialized.current = false; // Permite tentar novamente
+          }
+        })();
+      } else {
+        console.log('[App] ⚠️ Socket já foi inicializado, pulando reconexão');
+      }
     } else {
+      console.log('[App] ⚠️ Usuário não autenticado, mostrando tela de login');
       setScreen('auth');
     }
 
@@ -43,24 +71,37 @@ function App() {
       }
     }, 30000); // Ping a cada 30 segundos
 
-    // Cleanup
+    // Cleanup - IMPORTANTE: Não desconectar no cleanup para evitar desconexão no React Strict Mode
     return () => {
+      console.log('[App] 🧹 Cleanup do useEffect - removendo apenas ping interval');
       clearInterval(pingInterval);
-      socketService.disconnect();
+      // NÃO desconectar o socket aqui para prevenir desconexão prematura no Strict Mode
+      // socketService.disconnect();
     };
   }, []);
 
-  const handleAuthSuccess = () => {
+  const handleAuthSuccess = async () => {
+    console.log('[App] 🎉 handleAuthSuccess chamado - mudando para dashboard');
     setScreen('dashboard');
+    
     // Conectar Socket.IO após login bem-sucedido
-    socketService.connect();
+    console.log('[App] 🔌 Conectando socket após login...');
+    try {
+      console.log('[App] 🔄 Chamando socketService.connect()...');
+      await socketService.connect();
+      console.log('[App] ✅ Socket conectado com sucesso após login!');
+    } catch (err) {
+      console.error('[App] ❌ Falha ao conectar socket após login:', err);
+    }
   };
 
   const handleLogout = () => {
     if (confirm('Tem certeza que deseja sair?')) {
+      console.log('[App] 🚪 Logout: desconectando socket e limpando storage');
       // Desconectar Socket.IO antes de limpar storage
       socketService.disconnect();
       clearAllStorage();
+      socketInitialized.current = false; // Permite reconectar após novo login
       setScreen('auth');
     }
   };

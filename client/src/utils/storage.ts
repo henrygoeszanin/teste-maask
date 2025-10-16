@@ -10,6 +10,7 @@ const STORAGE_KEYS = {
   USER_EMAIL: "maask_user_email",
   CRIPTOGRAPHY_CODE: "maask_criptography_code",
   DEVICE_NAME: "maask_device_name",
+  DEVICE_ID: "maask_device_id",
 } as const;
 
 // ==================== TOKEN ====================
@@ -156,10 +157,28 @@ export function clearAllStorage() {
   clearUserEmail();
   clearCriptographyCode();
   clearDeviceName();
+  clearDeviceId();
 }
 
 // ==================== CHECK AUTH ====================
 
 export function isAuthenticated(): boolean {
   return getAccessToken() !== null && hasCriptographyCode();
+}
+
+// ==================== DEVICE ID ====================
+// ID único do dispositivo (UUID gerado pelo backend)
+
+export function saveDeviceId(deviceId: string) {
+  localStorage.setItem(STORAGE_KEYS.DEVICE_ID, deviceId);
+  console.log("[Storage] deviceId salvo:", deviceId);
+}
+
+export function getDeviceId(): string | null {
+  return localStorage.getItem(STORAGE_KEYS.DEVICE_ID);
+}
+
+export function clearDeviceId() {
+  localStorage.removeItem(STORAGE_KEYS.DEVICE_ID);
+  console.log("[Storage] deviceId removido");
 }

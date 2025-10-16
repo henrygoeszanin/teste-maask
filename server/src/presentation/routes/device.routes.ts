@@ -135,11 +135,11 @@ export function deviceRoutes(
           "Proteções: senha obrigatória, dispositivo não pode revogar a si mesmo, " +
           "apenas master devices podem revogar outros master devices",
         headers: z.object({
-          "x-device-name": z.string().min(1, "Device name é obrigatório"),
+          "x-device-id": z.string().min(1, "DeviceId é obrigatório"),
         }),
         body: withExamples(RevokeDeviceSchema, [
           {
-            deviceName: "Web-Win32-1744392847291",
+            deviceId: "JHJUHUFHDHE903090209U",
             password: "SenhaDoUsuario123!",
             reason: "user_initiated",
           },
@@ -151,11 +151,12 @@ export function deviceRoutes(
               data: {
                 deviceName: "Web-Win32-1744392847291",
                 revokedAt: "2025-10-14T12:05:00.000Z",
+                deviceId: "device-ulid-123",
               },
             },
           ]),
           400: withExamples(DeviceErrorResponseSchema, [
-            { error: "Missing X-Device-Name header" },
+            { error: "Missing x-device-id header" },
             { error: "Cannot revoke your current device" },
           ]),
           401: withExamples(DeviceErrorResponseSchema, [

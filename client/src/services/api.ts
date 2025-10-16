@@ -7,7 +7,7 @@ import {
   getRefreshToken,
   saveTokens,
   clearTokens,
-  getDeviceName,
+  getDeviceId, // Alterado de getDeviceName para getDeviceId
 } from "../utils/storage";
 
 const API_BASE_URL = "http://localhost:3000/api";
@@ -24,7 +24,9 @@ async function fetchAPI<T>(
   isRetry = false
 ): Promise<T> {
   const token = getAccessToken();
-  const deviceName = getDeviceName();
+  const deviceId = getDeviceId(); // Alterado de getDeviceName para getDeviceId
+
+  console.log("[API] deviceId from storage:", deviceId); // Debug: verificar se deviceId existe
 
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
@@ -42,9 +44,9 @@ async function fetchAPI<T>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  // Envia X-Device-Name para endpoints que precisam identificar o dispositivo
-  if (deviceName && endpoint.includes("/devices/revoke")) {
-    headers["X-Device-Name"] = deviceName;
+  // Envia X-Device-Id para endpoints que precisam identificar o dispositivo
+  if (deviceId && endpoint.includes("/devices/revoke")) {
+    headers["X-Device-Id"] = deviceId; // Alterado de X-Device-Name para X-Device-Id
   }
 
   console.log("[API] Request:", endpoint, options);
@@ -95,7 +97,7 @@ async function refreshAccessToken(): Promise<string> {
   refreshPromise = (async () => {
     try {
       const refreshToken = getRefreshToken();
-      const deviceName = getDeviceName();
+      const deviceId = getDeviceId();
 
       if (!refreshToken || refreshToken.length < 10) {
         console.error("[API] RefreshToken inválido ou ausente");
@@ -107,7 +109,7 @@ async function refreshAccessToken(): Promise<string> {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(deviceName && { "X-Device-Name": deviceName }),
+          ...(deviceId && { "X-Device-Id": deviceId }), // Alterado de X-Device-Name para X-Device-Id
         },
         body: JSON.stringify({ refreshToken }),
       });
@@ -202,6 +204,7 @@ export interface LoginResponse {
 }
 
 export async function login(data: LoginRequest): Promise<LoginResponse> {
+  console.log("[API] Login request data:", data); // Debug: verificar dados enviados
   return fetchAPI<LoginResponse>("/auth/login", {
     method: "POST",
     body: JSON.stringify(data),
@@ -270,6 +273,17 @@ export async function getDevice(deviceId: string): Promise<GetDeviceResponse> {
   return fetchAPI<GetDeviceResponse>(`/devices/${deviceId}`);
 }
 
+export interface RevokeDeviceRequest {
+  deviceId: string;
+  password: string;
+  reason?:
+    | "lost"
+    | "stolen"
+    | "suspicious"
+    | "employee_exit"
+    | "user_initiated";
+}
+
 export interface RevokeDeviceResponse {
   message: string;
   data: {
@@ -279,13 +293,11 @@ export interface RevokeDeviceResponse {
 }
 
 export async function revokeDevice(
-  deviceName: string,
-  password: string,
-  reason: string
+  data: RevokeDeviceRequest
 ): Promise<RevokeDeviceResponse> {
   return fetchAPI<RevokeDeviceResponse>("/devices/revoke", {
     method: "POST",
-    body: JSON.stringify({ deviceName, password, reason }),
+    body: JSON.stringify(data),
   });
 }
 

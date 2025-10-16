@@ -8,8 +8,8 @@ import crypto from "crypto";
 
 interface RevokeDeviceInput {
   userId: string; // ID do usuário autenticado
-  deviceNameToRevoke: string; // Device name a ser revogado
-  currentDeviceName: string; // Device name de quem está executando a revogação
+  deviceIdToRevoke: string; // Device name a ser revogado
+  currentDeviceId: string; // Device name de quem está executando a revogação
   password: string; // Senha do usuário (OBRIGATÓRIA)
   reason?: string; // Motivo da revogação (opcional)
 }
@@ -29,7 +29,7 @@ export class RevokeDeviceUseCase {
   ) {}
 
   async execute(input: RevokeDeviceInput): Promise<void> {
-    const { userId, deviceNameToRevoke, currentDeviceName, password } = input;
+    const { userId, deviceIdToRevoke, currentDeviceId, password } = input;
 
     // VALIDAÇÃO CRÍTICA: Verifica senha do usuário para a desativação do
     const user = await this.userRepository.findById(userId);
@@ -46,9 +46,7 @@ export class RevokeDeviceUseCase {
     }
 
     // 2. Busca dispositivo ATUAL (quem está revogando)
-    const currentDevice = await this.deviceRepository.findByDeviceName(
-      currentDeviceName
-    );
+    const currentDevice = await this.deviceRepository.findById(currentDeviceId);
 
     if (!currentDevice) {
       throw new AppError("Current device not found", 404);
@@ -63,8 +61,8 @@ export class RevokeDeviceUseCase {
     }
 
     // 3. Busca dispositivo ALVO (a ser revogado)
-    const deviceToRevoke = await this.deviceRepository.findByDeviceName(
-      deviceNameToRevoke
+    const deviceToRevoke = await this.deviceRepository.findById(
+      deviceIdToRevoke
     );
 
     if (!deviceToRevoke) {
@@ -80,7 +78,7 @@ export class RevokeDeviceUseCase {
     }
 
     // 4. ⚠️ PROTEÇÃO: Dispositivo não pode revogar a si mesmo
-    if (deviceNameToRevoke === currentDeviceName) {
+    if (deviceIdToRevoke === currentDeviceId) {
       throw new AppError(
         "Cannot revoke your current device. Please use another device to revoke this one.",
         400

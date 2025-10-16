@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { login, register, registerDevice } from '../services/api';
-import { saveTokens, saveUserEmail, saveCriptographyCode, getOrCreateDeviceName } from '../utils/storage';
+import { saveTokens, saveUserEmail, saveCriptographyCode, getOrCreateDeviceName, saveDeviceId } from '../utils/storage';
 
 interface AuthProps {
-  onAuthSuccess: () => void;
+  onAuthSuccess: () => Promise<void>;
 }
 
 export default function Auth({ onAuthSuccess }: AuthProps) {
@@ -28,6 +28,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
         setPassword('');
       } else {
         // Login
+        console.log('[Auth] Tentando login com:', { email, password: password ? '***' : 'EMPTY' }); // Debug
         const response = await login({ email, password });
         saveTokens(response.accessToken, response.refreshToken);
         saveUserEmail(email);
@@ -44,15 +45,20 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
         // Registrar dispositivo no backend
         console.log('[Auth] Registrando dispositivo no backend...');
         try {
-          await registerDevice({ deviceName });
-          console.log('[Auth] Dispositivo registrado com sucesso');
+          const deviceResponse = await registerDevice({ deviceName });
+          console.log('[Auth] Dispositivo registrado com sucesso:', deviceResponse.data);
+
+          // Salvar o deviceId retornado pelo backend
+          saveDeviceId(deviceResponse.data.id);
+          console.log('[Auth] deviceId salvo:', deviceResponse.data.id);
         } catch (deviceError) {
           console.warn('[Auth] Aviso: Falha ao registrar dispositivo:', deviceError);
           // Não bloqueia o login se o registro do dispositivo falhar
         }
 
         setMessage('✅ Login realizado com sucesso!');
-        setTimeout(() => onAuthSuccess(), 500);
+        // Chamamos onAuthSuccess e aguardamos a conexão do socket
+        await onAuthSuccess();
       }
     } catch (error) {
       setMessage(`❌ Erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);

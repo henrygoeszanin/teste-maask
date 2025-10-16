@@ -1,11 +1,11 @@
 import { FastifyInstance } from "fastify";
 import { SocketGateway } from "@/presentation/gateways/SocketGateway";
 
-import { healthRoutes } from "./healthRoutes";
-import { userRoutes } from "./userRoutes";
-import { authRoutes } from "./authRoutes";
-import { deviceRoutes } from "./deviceRoutes";
-import { fileRoutes } from "./fileRoutes";
+import { healthRoutes } from "./health.routes";
+import { userRoutes } from "./user.routes";
+import { authRoutes } from "./auth.routes";
+import { deviceRoutes } from "./device.routes";
+import { fileRoutes } from "./file.routes";
 
 export function registerRoutes(
   app: FastifyInstance,

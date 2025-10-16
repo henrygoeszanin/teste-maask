@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { listDevices, revokeDevice, deleteDevice } from '../services/api';
-import { getDeviceName, clearAllStorage } from '../utils/storage';
+import { getDeviceName, clearAllStorage, getDeviceId, saveDeviceId } from '../utils/storage';
 
 interface Device {
   id: string;
@@ -35,6 +35,12 @@ export default function DeviceManager() {
         window.location.href = '/';
         return;
       }
+
+      // Garantir que o deviceId do dispositivo atual esteja salvo
+      if (currentDevice && !getDeviceId()) {
+        console.log('[DeviceManager] Salvando deviceId do dispositivo atual:', currentDevice.id);
+        saveDeviceId(currentDevice.id);
+      }
     } catch (error) {
       console.error('Erro ao carregar dispositivos:', error);
     }
@@ -55,8 +61,24 @@ export default function DeviceManager() {
     setLoading(true);
 
     try {
+      // Ensure current deviceId is available before revoking
+      if (!getDeviceId()) {
+        const currentDevice = devices.find(d => d.deviceName === getDeviceName());
+        if (currentDevice) {
+          console.log('[DeviceManager] Salvando deviceId antes da revogação:', currentDevice.id);
+          saveDeviceId(currentDevice.id);
+        } else {
+          setMessage('❌ Não foi possível determinar o ID do dispositivo atual. Recarregue a página e tente novamente.');
+          return;
+        }
+      }
+
       setMessage(`🚫 Revogando dispositivo ${device.deviceName}...`);
-      await revokeDevice(device.deviceName, password, 'user_initiated');
+      await revokeDevice({
+        deviceId: device.id,
+        password,
+        reason: 'user_initiated'
+      });
 
       setMessage(`✅ Dispositivo "${device.deviceName}" revogado com sucesso!`);
       await loadDevices();
@@ -93,7 +115,7 @@ export default function DeviceManager() {
     }
   };
 
-  const currentDeviceName = getDeviceName();
+  const currentDeviceId = getDeviceId();
 
   const getStatusBadge = (status: string) => {
     const badges = {
@@ -141,7 +163,7 @@ export default function DeviceManager() {
         ) : (
           <div style={styles.devicesList}>
             {devices.map((device) => {
-              const isCurrentDevice = device.deviceName === currentDeviceName;
+              const isCurrentDevice = device.id === currentDeviceId;
               const badge = getStatusBadge(device.status);
 
               return (

@@ -748,7 +748,7 @@ const revokeResponse = await fetch("/api/devices/revoke", {
   method: "POST",
   headers: {
     Authorization: `Bearer ${accessToken}`,
-    "X-Device-Name": currentDeviceName, // Dispositivo que está revogando
+    "x-device-id": currentDeviceName, // Dispositivo que está revogando
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
@@ -773,7 +773,7 @@ if (revokeResponse.ok) {
 Cliente → API: POST /api/devices/revoke
 Headers: {
   "Authorization": "Bearer eyJhbGc...",
-  "X-Device-Name": "Win32-1697289600000"
+  "x-device-id": "Win32-1697289600000"
 }
 Body: {
   "deviceName": "iPhone-1697289700000",
@@ -783,7 +783,7 @@ Body: {
 
 API processa:
 1. Autentica usuário (JWT)
-2. Valida X-Device-Name header
+2. Valida x-device-id header
 3. Busca dispositivo atual (quem está revogando)
 4. Verifica se dispositivo atual está ativo
 5. Busca dispositivo alvo (a ser revogado)

@@ -13,7 +13,7 @@ export class RefreshTokenUseCase {
     private readonly deviceRepo: IDeviceRepository = new DeviceRepository()
   ) {}
 
-  async execute(data: RefreshTokenDTO, deviceName?: string) {
+  async execute(data: RefreshTokenDTO, deviceId: string) {
     try {
       const decoded = jwt.verify(
         data.refreshToken,
@@ -23,10 +23,10 @@ export class RefreshTokenUseCase {
       const user = await this.userRepo.findById(decoded.sub);
       if (!user) throw new AppError("Usuário não encontrado", 404);
 
-      // Se deviceName foi fornecido, validar se o dispositivo está ativo
-      if (deviceName) {
+      // Se deviceId foi fornecido, validar se o dispositivo está ativo
+      if (deviceId) {
         const devices = await this.deviceRepo.findByUserId(user.id, "active");
-        const device = devices.find((d) => d.deviceName === deviceName);
+        const device = devices.find((d) => d.id === deviceId);
         if (!device) {
           throw new AppError("DEVICE_REVOKED", 401);
         }

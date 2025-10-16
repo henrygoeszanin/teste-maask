@@ -149,7 +149,7 @@ export class DeviceController {
    * - Exige senha do usuário
    * - Dispositivo não pode revogar a si mesmo
    * - Notifica dispositivo revogado via Socket.IO em tempo real
-   * @param request - Requisição Fastify contendo deviceName e password no body, x-device-name no header
+   * @param request - Requisição Fastify contendo deviceName e password no body, x-device-id no header
    * @param reply - Resposta Fastify
    * @returns Retorna confirmação de revogação ou erro de validação/autorização
    */
@@ -161,12 +161,12 @@ export class DeviceController {
       const body = request.body as RevokeDeviceDTO;
       const userId = request.user!.id;
 
-      // Extrai deviceName do header X-Device-Name (dispositivo que está fazendo a revogação)
-      const currentDeviceName = request.headers["x-device-name"] as string;
+      // Extrai deviceName do header x-device-id (dispositivo que está fazendo a revogação)
+      const currentDeviceId = request.headers["x-device-id"] as string;
 
-      if (!currentDeviceName) {
+      if (!currentDeviceId) {
         return reply.status(400).send({
-          error: "Missing X-Device-Name header",
+          error: "Missing x-device-id header",
         });
       }
 
@@ -177,15 +177,26 @@ export class DeviceController {
 
       await useCase.execute({
         userId,
-        deviceNameToRevoke: body.deviceName,
-        currentDeviceName,
+        deviceIdToRevoke: body.deviceId,
+        currentDeviceId,
         password: body.password,
         reason: body.reason ?? undefined,
       });
 
+      // Buscar o dispositivo revogado para obter o deviceName
+      const revokedDevice = await deviceRepository.findById(body.deviceId);
+
+      if (!revokedDevice) {
+        return reply.status(404).send({ error: "Device not found" });
+      }
+
       // Notifica o dispositivo que está sendo revogado
       if (this.websocketGateway) {
-        this.websocketGateway.notifyDeviceRevoked(userId, body.deviceName);
+        this.websocketGateway.notifyDeviceRevoked(
+          userId,
+          body.deviceId,
+          revokedDevice.deviceName
+        );
       } else {
         console.warn(
           "[DeviceRevocationController] SocketGateway não disponível - notificação em tempo real desabilitada"
@@ -195,7 +206,8 @@ export class DeviceController {
       return reply.status(200).send({
         message: "Device revoked successfully",
         data: {
-          deviceName: body.deviceName,
+          deviceName: revokedDevice.deviceName,
+          deviceId: body.deviceId,
           revokedAt: new Date().toISOString(),
         },
       });
