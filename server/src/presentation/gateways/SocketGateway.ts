@@ -1,8 +1,34 @@
+/**
+ * SocketGateway.ts
+ * Gateway para comunicação em tempo real (Socket.IO).
+ * - Autentica conexões via JWT no handshake
+ * - Exige `deviceId` no handshake para associar sockets a dispositivos
+ * - Emite evento `device-revoked` quando um dispositivo é revogado
+ *
+ * Comentários em Português; mensagens de erro lançadas em English
+ * para manter consistência com a política do projeto.
+ */
 import { FastifyInstance } from "fastify";
 import { Server as SocketIOServer, Socket } from "socket.io";
-import { Socket as NetSocket } from "net";
 import jwt from "jsonwebtoken";
 import { config } from "@/config";
+
+// Tipos auxiliares para documentação e clareza
+interface SocketHandshakeData {
+  token?: string;
+  deviceId?: string;
+  deviceName?: string;
+  headers?: Record<string, string | string[] | undefined>;
+  remoteAddress?: string;
+}
+
+interface JwtPayload {
+  sub: string; // user id
+  email: string;
+  name?: string;
+  iat?: number;
+  exp?: number;
+}
 
 export interface AuthenticatedSocket extends Socket {
   userId: string;
@@ -28,24 +54,19 @@ export class SocketGateway {
       transports: ["websocket", "polling"],
     });
 
-    // Registra apenas handlers essenciais do servidor HTTP (somente erros)
-    try {
-      const httpServer = fastify.server as unknown as import("http").Server;
-      httpServer.on("clientError", (err: Error, _socket: NetSocket) => {
-        console.error("[SocketGateway] HTTP clientError:", err?.message || err);
-      });
-    } catch (e) {
-      // Não falhar se algum servidor customizado não expuser estes eventos
-      console.warn(
-        "[SocketGateway] Não foi possível registrar listeners HTTP:",
-        e
-      );
-    }
-
+    // Middleware, handlers e listeners de erro separados em helpers
     this.setupMiddleware();
     this.setupEventHandlers();
+    this.setupErrorHandlers();
+  }
 
-    // Escuta erros gerais do Socket.IO
+  /**
+   * Anexa listeners de erro para Socket.IO e engine.io.
+   * Encapsula tentativa de registro para evitar falhas caso o runtime não suporte
+   * hooks internos.
+   */
+  private setupErrorHandlers(): void {
+    // Socket.IO global error listener
     try {
       this.io.on("error", (err: Error) => {
         console.error(
@@ -60,14 +81,19 @@ export class SocketGateway {
       );
     }
 
-    // engine.io-level hooks: apenas erro é logado
+    // engine.io-level hooks (se exposto)
     try {
-      const engine = (this.io as any).engine;
-      if (engine) {
-        engine.on("error", (err: any) => {
+      const engine = (
+        this.io as unknown as {
+          engine?: { on: (event: string, cb: (err: unknown) => void) => void };
+        }
+      ).engine;
+
+      if (engine && typeof engine.on === "function") {
+        engine.on("error", (err: unknown) => {
           console.error(
             "[SocketGateway] engine.io error ->",
-            err?.message || err
+            (err as Error)?.message || err
           );
         });
       }
@@ -83,53 +109,36 @@ export class SocketGateway {
   private setupMiddleware() {
     this.io.use((socket, next) => {
       try {
-        const handshake = socket.handshake as unknown as {
-          auth?: { token?: string; deviceId?: string; deviceName?: string };
-          headers?: Record<string, string | string[] | undefined>;
-          address?: string;
-        };
-
-        const { token, deviceId, deviceName } = (handshake.auth || {}) as {
-          token?: string;
-          deviceId?: string;
-          deviceName?: string;
-        };
-
-        // Remote address do handshake quando disponível (não garante engine.conn)
-        const remoteAddress = handshake?.address ?? "unknown";
-        const headers = handshake?.headers ?? {};
+        // Extrai dados do handshake de forma centralizada
+        const { token, deviceId, deviceName, headers, remoteAddress } =
+          this.parseHandshake(socket);
 
         if (!token) {
           console.warn("[SocketGateway] Rejeitando conexão: token ausente", {
             remoteAddress,
             deviceId,
-            origin: headers.origin || headers.referer,
+            origin: headers?.origin || headers?.referer,
           });
           return next(new Error("Authentication token required"));
         }
 
-        // For security, deviceId must be provided in the handshake
         if (!deviceId) {
           console.warn("[SocketGateway] Rejeitando conexão: deviceId ausente", {
             remoteAddress,
-            origin: headers.origin || headers.referer,
+            origin: headers?.origin || headers?.referer,
           });
           return next(new Error("Device ID required in handshake"));
         }
 
-        // Valida JWT
-        const decoded = jwt.verify(token, config.auth.jwtSecret) as {
-          sub: string;
-          email: string;
-          name: string;
-        };
-
-        // Adiciona dados do usuário ao socket tipado
-        const authSocket = socket as AuthenticatedSocket;
-        authSocket.userId = decoded.sub;
-        authSocket.deviceId = deviceId; // Guarda o deviceId no socket (obrigatório)
-        authSocket.deviceName = deviceName; // deviceName opcional
-        authSocket.email = decoded.email;
+        // Verifica token e anexa dados ao socket tipado
+        this.verifyAndAttachSocketAuth(
+          socket,
+          token,
+          deviceId,
+          deviceName,
+          remoteAddress,
+          headers
+        );
 
         next();
       } catch (error) {
@@ -145,6 +154,91 @@ export class SocketGateway {
   }
 
   /**
+   * Extracts token/deviceId/deviceName and headers from the socket handshake.
+   *
+   * @returns SocketHandshakeData - shape: { token, deviceId, deviceName, headers, remoteAddress }
+   *
+   * @example
+   * handshake example
+   * {
+   *   auth: { token: 'jwt', deviceId: 'sha256...', deviceName: 'laptop' },
+   *   headers: { origin: 'https://app' }
+   * }
+   */
+  private parseHandshake(socket: Socket): SocketHandshakeData {
+    const handshake = socket.handshake as unknown as {
+      auth?: { token?: string; deviceId?: string; deviceName?: string };
+      headers?: Record<string, string | string[] | undefined>;
+      address?: string;
+    };
+
+    const token = handshake.auth?.token;
+    const deviceId = handshake.auth?.deviceId;
+    const deviceName = handshake.auth?.deviceName;
+    const headers = handshake.headers ?? {};
+
+    // Prefer handshake.address, fallback para X-Forwarded-For se presente
+    let remoteAddress = handshake.address ?? "unknown";
+    const xff = headers["x-forwarded-for"] as string | undefined;
+    if ((!remoteAddress || remoteAddress === "unknown") && xff) {
+      remoteAddress = xff.split(",")[0].trim();
+    }
+
+    return { token, deviceId, deviceName, headers, remoteAddress };
+  }
+
+  /**
+   * Verifica o JWT e anexa informações de usuário no socket.
+   * Lance Errors com mensagens em English conforme convenção do projeto.
+   *
+   * @throws Error quando o token for inválido ou claims estiverem ausentes
+   */
+  private verifyAndAttachSocketAuth(
+    socket: Socket,
+    token: string,
+    deviceId: string,
+    deviceName?: string,
+    remoteAddress?: string,
+    headers?: Record<string, string | string[] | undefined>
+  ) {
+    // Validação do token JWT
+    let decoded: JwtPayload;
+    try {
+      decoded = jwt.verify(token, config.auth.jwtSecret) as JwtPayload;
+    } catch (err) {
+      console.error("[SocketGateway] JWT verification failed:", {
+        message: (err as Error)?.message || err,
+        remoteAddress,
+      });
+      throw new Error("Invalid authentication token");
+    }
+
+    // Verifica claims essenciais
+    if (!decoded || !decoded.sub || !decoded.email) {
+      console.warn("[SocketGateway] JWT missing required claims", {
+        remoteAddress,
+        deviceId,
+        headers: headers?.origin,
+      });
+      throw new Error("Invalid authentication token");
+    }
+
+    // Anexa ao socket tipado
+    const authSocket = socket as AuthenticatedSocket;
+    authSocket.userId = decoded.sub;
+    authSocket.deviceId = deviceId;
+    authSocket.deviceName = deviceName;
+    authSocket.email = decoded.email;
+
+    // Log de sucesso da autenticação (informativo)
+    console.info("[SocketGateway] Socket authenticated", {
+      userId: authSocket.userId,
+      deviceId: authSocket.deviceId,
+      remoteAddress,
+    });
+  }
+
+  /**
    * Configura event handlers do Socket.IO
    */
   private setupEventHandlers() {
@@ -152,7 +246,8 @@ export class SocketGateway {
       const authSocket = socket as AuthenticatedSocket;
       const { userId, deviceName, email } = authSocket;
 
-      console.log("SocketGateway] Novo dispositivo conectado:", {
+      // Log informativo quando um novo dispositivo se conecta
+      console.info("[SocketGateway] Novo dispositivo conectado:", {
         userId,
         deviceName,
         email,
