@@ -190,15 +190,6 @@ O Launcher da Maask precisa abrir/fechar perfis de navegador de forma segura e r
 
 ---
 
-### Error Handling & Message Language
-
-- All server-side error messages must be in English. This includes both machine-readable error codes and human-readable messages returned in API responses.
-- Machine-readable error codes should follow UPPER_SNAKE_CASE (for example `DEVICE_REVOKED`, `TOKEN_EXPIRED`, `USER_NOT_FOUND`).
-- Human-readable messages should be concise and in English (for example `Authentication token has expired. Please login again.`).
-- See `server/docs/error-handling.md` for the full response contract and examples.
-
----
-
 ### 7. ✅ Instruções para Rodar e Testar
 
 **Requisito:**
@@ -238,6 +229,35 @@ O Launcher da Maask precisa abrir/fechar perfis de navegador de forma segura e r
 
 - Notificações por email/SMS ao registrar novo dispositivo
 - Registro de novo dispositivo no login, usando identificadior único (mac address ou similar)
+
+# Mlhoria de identificaão de devices - Device attestation — identidade baseada em chave (TPM + fallback DPAPI)
+
+Resumo: no primeiro run o cliente gera um par de chaves ECDSA/Ed25519 não-exportable no TPM (ou, se não houver TPM, protege a chave com DPAPI e Windows Certificate Store). O cliente prova posse assinando um nonce enviado pelo servidor; o servidor armazena o publicKey (ou apenas seu fingerprint) e grava deviceId = SHA256(publicKey). Para operações sensíveis (ex.: geração de presigned URLs) o servidor exige prova de posse (challenge-response) ou mTLS. Revogação é feita removendo o publicKey/certificate e notificando via Socket.IO.
+
+## Fluxo resumido
+
+1. First-run: gerar chave no TPM/CNG (non-exportable).
+2. Registro: servidor fornece nonce → cliente assina → cliente envia publicKey + signature → servidor verifica e registra fingerprint (deviceId). Exigir senha/2FA no registro.
+3. Uso: antes de operações sensíveis servidor envia nonce → cliente assina → servidor valida com publicKey.
+4. Revogação: servidor marca device como revoked, notifica via Socket.IO e invalida provas futuras.
+
+## Fallback Windows
+
+- Sem TPM: gerar chave local e proteger com DPAPI; armazenar no Windows Certificate Store.
+- Exigir autenticação local (Windows Hello / PIN) para liberar o uso da chave em operações críticas.
+- Marcar dispositivos sem suporte hardware como "reduced trust" e aplicar controles adicionais (ex.: 2FA para downloads).
+
+## Headers e preimage recomendados
+
+- x-device-id: <deviceId = SHA256(publicKey)>
+- x-device-ts: <ISO timestamp>
+- x-device-signature: <base64(signature(method+"\n"+path+"\n"+timestamp))>
+- Preimage consistente: `${method}\n${path}\n${timestamp}`
+- TTL do timestamp: 30–120s (recomendar 60s). Rejeitar fora do intervalo para prevenir replay.
+
+## Device ID
+
+- deviceId = SHA256(publicKeyPem) — armazenar apenas fingerprint no banco, nunca o private key.
 
 **Localização:**
 

@@ -144,9 +144,17 @@ export default function DeviceManager() {
       <div style={styles.infoBox}>
         <h3 style={styles.infoTitle}>ℹ️ Sobre Dispositivos</h3>
         <p style={styles.infoText}>
-          Cada dispositivo é identificado por um nome único. Todos os dispositivos autorizados
+          Cada dispositivo é identificado por um nome e id único. Todos os dispositivos autorizados
           têm acesso à mesma chave de criptografia gerada pelo servidor.
         </p>
+
+        <p style={styles.infoText}>
+          Nota: navegadores não expõem o endereço MAC por questões de privacidade. Para identificação única:
+          em aplicações web gere um deviceId (UUID) no primeiro acesso e armazene-o em localStorage; em
+          aplicações desktop nativas prefira um identificador do sistema (ex.: machine-id) ou um identificador
+          fornecido pelo launcher.
+        </p>
+
         <p style={styles.infoText}>
           Para revogar um dispositivo, clique em <strong>"Revogar"</strong>.
           Esta ação bloqueia o acesso à API mas não remove arquivos já baixados.

@@ -1,0 +1,46 @@
+services:
+  # ============================================================================
+  # API Backend (Node.js + Fastify + TypeScript)
+  # ============================================================================
+  api:
+    build:
+      context: ./server
+      dockerfile: dockerfile
+      target: production
+    container_name: maask-api
+    restart: unless-stopped
+    env_file:
+      - ./server/.env.docker
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      HOST: 0.0.0.0
+    ports:
+      - "${API_PORT:-3000}:3000"
+    volumes:
+      - ./server/drizzle:/usr/src/api/drizzle:ro
+    networks:
+      - maask-network
+
+  # ============================================================================
+  # Client Frontend (React + Vite + Nginx)
+  # ============================================================================
+  client:
+    build:
+      context: ./client
+      dockerfile: dockerfile
+      target: production
+    container_name: maask-client
+    restart: unless-stopped
+    ports:
+      - "${CLIENT_PORT:-80}:80"
+    networks:
+      - maask-network
+    env_file:
+      - ./client/.env.docker
+    depends_on: [api]
+
+networks:
+  maask-network:
+    name: maask-network
+    driver: bridge
